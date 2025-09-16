@@ -1,0 +1,13 @@
+flask==2.3.3
+requests==2.31.0
+schedule==1.2.0
+python-dateutil==2.8.2
+plotly==5.17.0
+pandas==1.5.3
+numpy==1.24.3
+
+# Bluetooth integration (optional)
+pybluez==0.23
+dbus-python==1.3.2
+PyGObject==3.46.0
+bleak==0.21.1
