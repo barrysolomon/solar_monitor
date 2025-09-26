@@ -1,0 +1,19 @@
+# Core dependencies for Solar Monitor
+flask>=2.3.0
+requests>=2.31.0
+schedule>=1.2.0
+python-dateutil>=2.8.2
+
+# System monitoring
+psutil>=5.9.0
+
+# Timezone support
+pytz>=2023.3
+
+# Data processing (lightweight versions for Pi)
+numpy>=1.21.0
+pandas>=1.3.0
+
+# Optional: Bluetooth integration (install manually if needed)
+# pybluez>=0.23
+# bleak>=0.21.1

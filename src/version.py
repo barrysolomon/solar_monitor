@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+"""
+Version information for Solar Monitor
+
+Copyright (c) 2025 Barry Solomon
+Licensed under the MIT License (see LICENSE file)
+"""
+
+VERSION = {
+    'major': 1,
+    'minor': 0,
+    'patch': 0,
+    'build': 54,  # Build number - increment for each deployment
+    'release_date': '2025-09-25',
+    'features': [
+        'Beautiful Modern UI with Gradient Cards',
+        'Interactive Chart.js Analytics',
+        'Professional Inverters Monitoring',
+        'Advanced System Management',
+        'Comprehensive Data Management with AG-Grid',
+        'Tree-View Help & Documentation System',
+        'Real-time PVS6 Data Collection',
+        'Zero Downtime Deployment',
+        'Production-Ready Architecture'
+    ],
+    'status': 'Production Release',
+    'description': 'Professional solar monitoring system for SunPower PVS6 gateways'
+}
+
+def get_version_string():
+    """Return formatted version string with build number"""
+    return f"v{VERSION['major']}.{VERSION['minor']}.{VERSION['patch']}.{VERSION['build']}"
+
+def get_full_version_info():
+    """Return complete version information"""
+    return {
+        'version': get_version_string(),
+        'release_date': VERSION['release_date'],
+        'status': VERSION['status'],
+        'description': VERSION['description'],
+        'features': VERSION['features']
+    }
+
+if __name__ == '__main__':
+    print(f"Solar Monitor {get_version_string()}")
+    print(f"Release Date: {VERSION['release_date']}")
+    print(f"Status: {VERSION['status']}")
+    print(f"Description: {VERSION['description']}")
+    print("\nFeatures:")
+    for feature in VERSION['features']:
+        print(f"  • {feature}")
