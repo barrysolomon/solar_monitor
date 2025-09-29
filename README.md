@@ -1,4 +1,4 @@
-# Solar Monitor v1.0.0.36+ - SunPower Monitoring System 🏆
+# Solar Monitor v1.1.0.97 - SunPower Monitoring System 🏆
 
 **🌞 Complete Local Solar Monitoring Solution - PRODUCTION READY!**
 
@@ -46,7 +46,7 @@ This is your system working perfectly - generating clean energy, powering your h
 - **🔗 Direct PVS6 Access**: Connect directly to your SunPower gateway
 - **⚡ Real-Time Data**: Live system status, device information, and historical data
 
-## ✨ Features (v1.0.0 - Production Release)
+## ✨ Features (v1.1.0.97 - Production Release)
 
 ### 🎨 **Modern Web Interface**
 - **Card-Based Layout**: Clean, organized design throughout all pages
@@ -334,6 +334,6 @@ This software is not affiliated with or endorsed by SunPower Corporation. SunPow
 
 Ready to take control of your solar data? Get started with the one-command installation above.
 
-**Current Version**: v1.0.0 Production Release  
-**Last Updated**: September 25, 2025  
+**Current Version**: v1.1.0.97 Production Release  
+**Last Updated**: September 29, 2025  
 **System Status**: 🟢 Production Ready

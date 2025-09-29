@@ -908,12 +908,12 @@ def get_page_content(page):
             <div class="sky-background" id="sky-background" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 20px; transition: background 2s ease-in-out; z-index: 1;"></div>
             
             <!-- 5-Column Grid Container (Clean Final Layout) -->
-            <div style="display: grid; grid-template-columns: 0.6fr 1fr 1.4fr 1fr 0.6fr; grid-template-rows: 100px 120px 150px; gap: 15px; position: relative; z-index: 2;">
+            <div style="display: grid; grid-template-columns: 0.6fr 1fr 1.4fr 1fr 0.6fr; grid-template-rows: 100px 120px 150px; gap: 15px; position: relative; z-index: 2; padding: 30px 0;">
                 
                 <!-- Row 1, Col 2: Sun Movement (above house) -->
-                <div style="grid-column: 2; grid-row: 1; position: relative; display: flex; align-items: center; justify-content: center;">
+                <div style="grid-column: 2; grid-row: 1; position: relative; display: flex; align-items: flex-end; justify-content: center;">
                     <!-- Tangled-Style Sun -->
-                    <div class="celestial-body" id="celestial-body" style="transition: all 1s ease-in-out; z-index: 10;">
+                    <div class="celestial-body" id="celestial-body" style="transition: all 1s ease-in-out; z-index: 10; margin-bottom: -20px;">
                         <div class="tangled-sun" style="position: relative; width: 80px; height: 80px;">
                             <!-- Sun Rays (Background) -->
                             <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 120px; height: 120px; background: radial-gradient(circle, rgba(255, 215, 0, 0.3) 0%, rgba(255, 140, 0, 0.2) 40%, transparent 70%); border-radius: 50%; animation: gentleRotate 20s linear infinite;"></div>
