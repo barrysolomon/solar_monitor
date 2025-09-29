@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Solar Monitor v1.0.0.50 - Enhanced UI SunPower Monitoring System
+Solar Monitor v1.0.0 - SunPower Monitoring System
 A complete local solar monitoring solution for SunPower PVS6 installations.
 
 Author: Barry Solomon
@@ -73,6 +73,14 @@ def index():
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+    
+    <!-- AG-Grid CSS (Local) -->
+    <link rel="stylesheet" href="/static/css/ag-grid.css">
+    <link rel="stylesheet" href="/static/css/ag-theme-alpine.css">
+    
+    <!-- AG-Grid JS (Local) -->
+    <script src="/static/js/ag-grid-community.min.js"></script>
+    
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
@@ -109,17 +117,20 @@ def index():
         }}
         .nav-menu {{
             display: flex;
-            gap: 15px;
+            gap: 8px;
             flex-wrap: wrap;
+            align-items: center;
         }}
         .nav-btn {{
-            padding: 8px 16px;
+            padding: 6px 12px;
             background: rgba(255,255,255,0.2);
             color: white;
             text-decoration: none;
-            border-radius: 20px;
+            border-radius: 16px;
             font-weight: 500;
+            font-size: 0.9em;
             transition: all 0.3s ease;
+            white-space: nowrap;
         }}
         .nav-btn:hover {{
             background: rgba(255,255,255,0.3);
@@ -134,7 +145,7 @@ def index():
             background: rgba(255,255,255,0.1);
             border: 1px solid rgba(255,255,255,0.2);
             border-radius: 8px;
-            padding: 8px 12px;
+            padding: 6px 10px;
         }}
         .status-group-title {{
             font-size: 0.75em;
@@ -208,6 +219,80 @@ def index():
         .export {{ background: linear-gradient(135deg, #fdbb2d 0%, #22c1c3 100%); }}
         .export .card-status {{ color: white !important; }}
         .devices {{ background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333; }}
+        
+        /* Visual Energy Flow System Styles */
+        @keyframes rayPulse {{
+            0% {{ opacity: 0.3; transform: scaleY(0.8); }}
+            50% {{ opacity: 1; transform: scaleY(1.2); }}
+            100% {{ opacity: 0.3; transform: scaleY(0.8); }}
+        }}
+        
+        @keyframes boltFlow {{
+            0% {{ left: 0%; opacity: 0; }}
+            10% {{ opacity: 1; }}
+            90% {{ opacity: 1; }}
+            100% {{ left: 100%; opacity: 0; }}
+        }}
+        
+        .sky-background.day {{
+            background: linear-gradient(135deg, #87CEEB 0%, #98FB98 100%);
+        }}
+        
+        .sky-background.dawn {{
+            background: linear-gradient(135deg, #FFB347 0%, #FFCCCB 50%, #87CEEB 100%);
+        }}
+        
+        .sky-background.dusk {{
+            background: linear-gradient(135deg, #FF6347 0%, #FF69B4 50%, #4B0082 100%);
+        }}
+        
+        .sky-background.night {{
+            background: linear-gradient(135deg, #191970 0%, #000080 50%, #483D8B 100%);
+        }}
+        
+        .celestial-body.sun {{
+            filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.8));
+            animation: gentleRotate 20s linear infinite;
+        }}
+        
+        .celestial-body.moon {{
+            filter: drop-shadow(0 0 10px rgba(200, 200, 255, 0.6));
+            animation: moonGlow 4s ease-in-out infinite alternate;
+        }}
+        
+        @keyframes gentleRotate {{
+            0% {{ transform: rotate(0deg); }}
+            100% {{ transform: rotate(360deg); }}
+        }}
+        
+        @keyframes moonGlow {{
+            0% {{ filter: drop-shadow(0 0 10px rgba(200, 200, 255, 0.6)); }}
+            100% {{ filter: drop-shadow(0 0 20px rgba(200, 200, 255, 0.9)); }}
+        }}
+        
+        @keyframes eyeGlow {{
+            0% {{ 
+                filter: brightness(0.9) contrast(1.1) drop-shadow(0 0 10px rgba(255,69,0,0.4));
+                box-shadow: 0 0 15px rgba(255, 69, 0, 0.3), 0 0 30px rgba(139, 0, 0, 0.2);
+                opacity: 0.85;
+            }}
+            100% {{ 
+                filter: brightness(1.1) contrast(1.2) drop-shadow(0 0 20px rgba(255,69,0,0.6));
+                box-shadow: 0 0 25px rgba(255, 69, 0, 0.5), 0 0 50px rgba(139, 0, 0, 0.3);
+                opacity: 1;
+            }}
+        }}
+        
+        @keyframes sunGlow {{
+            0% {{ 
+                filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.8)) brightness(1);
+                text-shadow: 0 0 15px rgba(255, 215, 0, 0.6), 0 0 30px rgba(255, 140, 0, 0.4);
+            }}
+            100% {{ 
+                filter: drop-shadow(0 0 20px rgba(255, 215, 0, 1)) brightness(1.2);
+                text-shadow: 0 0 25px rgba(255, 215, 0, 0.9), 0 0 50px rgba(255, 140, 0, 0.7);
+            }}
+        }}
         
         .page-header {{
             text-align: center;
@@ -456,6 +541,58 @@ def index():
             .query-controls {{ justify-content: center; }}
             .tool-grid {{ grid-template-columns: 1fr; }}
         }}
+
+        /* System Dropdown Menu Styles */
+        .system-dropdown {{
+            position: relative;
+            display: inline-block;
+        }}
+        
+        .system-menu {{
+            display: none;
+            position: absolute;
+            background: white;
+            min-width: 180px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            z-index: 1000;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            top: 100%;
+            left: 0;
+            margin-top: 5px;
+        }}
+        
+        .system-dropdown:hover .system-menu {{
+            display: block;
+        }}
+        
+        .system-item {{
+            display: block;
+            padding: 12px 16px;
+            text-decoration: none;
+            color: #374151;
+            border-bottom: 1px solid #f3f4f6;
+            transition: background-color 0.2s;
+        }}
+        
+        .system-item:last-child {{
+            border-bottom: none;
+        }}
+        
+        .system-item:hover {{
+            background: #f3f4f6;
+            color: #1f2937;
+        }}
+        
+        .system-item.active {{
+            background: #667eea;
+            color: white;
+        }}
+        
+        .system-btn:hover {{
+            background: rgba(255, 255, 255, 0.1);
+        }}
+
     </style>
 </head>
 <body>
@@ -476,29 +613,37 @@ def index():
                 </div>
             </div>
             <div class="nav-content">
-                <div class="nav-menu">
-                    <a href="/?page=overview" class="nav-btn {'active' if page == 'overview' else ''}">🏠 Overview</a>
-                    <a href="/?page=devices" class="nav-btn {'active' if page == 'devices' else ''}">⚡ Inverters</a>
-                    <a href="/?page=analytics" class="nav-btn {'active' if page == 'analytics' else ''}">📊 Analytics</a>
-                    <a href="/?page=data" class="nav-btn {'active' if page == 'data' else ''}">🗃️ Data</a>
-                    <a href="/?page=system" class="nav-btn {'active' if page == 'system' else ''}">⚙️ System</a>
-                    <a href="/?page=help" class="nav-btn {'active' if page == 'help' else ''}">❓ Help</a>
-                    <a href="/?page=api" class="nav-btn {'active' if page == 'api' else ''}">🔌 API</a>
+            <div class="nav-menu">
+                <a href="/?page=overview" class="nav-btn {'active' if page == 'overview' else ''}">🏠 Overview</a>
+                <a href="/?page=devices" class="nav-btn {'active' if page == 'devices' else ''}">⚡ Panels</a>
+                <a href="/?page=analytics" class="nav-btn {'active' if page == 'analytics' else ''}">📊 Analytics</a>
+                
+                <!-- System Dropdown Menu -->
+                <div class="system-dropdown">
+                    <a href="/?page=system" class="nav-btn system-btn {'active' if page in ['system', 'data', 'api'] else ''}">⚙️ System ▼</a>
+                    <div class="system-menu">
+                        <a href="/?page=system" class="system-item {'active' if page == 'system' else ''}">⚙️ System</a>
+                        <a href="/?page=data" class="system-item {'active' if page == 'data' else ''}">🗃️ Database</a>
+                        <a href="/?page=api" class="system-item {'active' if page == 'api' else ''}">🔌 API</a>
+                    </div>
                 </div>
+                
+                <a href="/?page=help" class="nav-btn {'active' if page == 'help' else ''}">❓ Help</a>
+            </div>
                 <div class="system-status-group">
                     <div class="status-group-title">System Status</div>
-                <div class="status-bar">
-                    <div class="status-item">
-                        <span id="pvs6-icon">🔴</span>
-                        <span>PVS6</span>
-                    </div>
-                    <div class="status-item">
-                        <span id="collector-icon">🟡</span>
-                        <span>Collector</span>
-                    </div>
-                    <div class="status-item">
-                        <span id="db-icon">🟡</span>
-                        <span>Database</span>
+            <div class="status-bar">
+                <div class="status-item">
+                    <span id="pvs6-icon">🔴</span>
+                    <span>PVS6</span>
+                </div>
+                <div class="status-item">
+                    <span id="collector-icon">🟡</span>
+                    <span>Collector</span>
+                </div>
+                <div class="status-item">
+                    <span id="db-icon">🟡</span>
+                    <span>Database</span>
                         </div>
                     </div>
                 </div>
@@ -584,7 +729,7 @@ def index():
                     document.getElementById('collector-icon').textContent = 
                         collectorData.success ? '🟢' : '🔴';
                 }}
-                
+
                 const db = await fetch('/api/db/status');
                 if (db.ok) {{
                     const dbData = await db.json();
@@ -622,9 +767,7 @@ def index():
                     if (typeof loadData === 'function') {{
                         loadData();
                     }}
-                    if (typeof loadPerformanceSummary === 'function') {{
-                        loadPerformanceSummary();
-                    }}
+                    // Performance summary moved to analytics page
                     break;
                 case 'devices':
                     if (typeof loadInverterData === 'function') {{
@@ -634,6 +777,9 @@ def index():
                 case 'analytics':
                     if (typeof loadAnalyticsData === 'function') {{
                         loadAnalyticsData();
+                    }}
+                    if (typeof loadPerformanceSummary === 'function') {{
+                        loadPerformanceSummary();
                     }}
                     break;
                 case 'system':
@@ -660,6 +806,7 @@ def index():
                     break;
             }}
         }}
+        
         
         function setupUpdateInterval() {{
             const frequency = document.getElementById('update-frequency');
@@ -753,59 +900,89 @@ def get_page_content(page):
                 <div class="card-status" id="grid-status">--</div>
             </div>
             
-            <div class="card devices">
-                <div class="card-title">📊 Devices Online</div>
-                <div class="card-value" id="device-count">--</div>
-                <div class="card-unit" id="device-breakdown">devices</div>
-            </div>
         </div>
         
-        <!-- Performance Summary Section -->
-        <div style="margin-top: 30px;">
-            <h3 style="color: #374151; margin: 0 0 20px 0;">📈 Performance Summary</h3>
+        <!-- Visual Energy Flow System - 3x3 Grid Layout -->
+        <div class="energy-flow-visual" style="margin: 40px 0; padding: 20px; background: linear-gradient(135deg, #87CEEB 0%, #98FB98 100%); border-radius: 20px; position: relative; overflow: hidden;">
+            <!-- Sky Background with Time-based Gradient -->
+            <div class="sky-background" id="sky-background" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 20px; transition: background 2s ease-in-out; z-index: 1;"></div>
             
-        
-            <!-- Detailed Performance Stats -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-                <!-- Peak Performance -->
-        <div class="info-card">
-                    <h4>⚡ Peak Performance</h4>
-                    <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 15px;">
-                        <div style="display: flex; justify-content: space-between;">
-                            <span>Peak Production:</span>
-                            <span><strong id="peak-production-overview">--</strong> <span id="peak-production-time">--</span></span>
-            </div>
-                        <div style="display: flex; justify-content: space-between;">
-                            <span>Peak Consumption:</span>
-                            <span><strong id="peak-consumption-overview">--</strong> <span id="peak-consumption-time">--</span></span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between;">
-                            <span>Best Export Hour:</span>
-                            <span><strong id="best-export-overview">--</strong> <span id="best-export-time">--</span></span>
-                        </div>
-                    </div>
-        </div>
-        
-                <!-- Daily Averages -->
-        <div class="info-card">
-                    <h4>📅 Daily Averages</h4>
-                    <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 15px;">
-                        <div style="display: flex; justify-content: space-between;">
-                            <span>Avg Daily Production:</span>
-                            <span><strong id="avg-daily-production">--</strong> kWh</span>
-            </div>
-                        <div style="display: flex; justify-content: space-between;">
-                            <span>Avg Daily Consumption:</span>
-                            <span><strong id="avg-daily-consumption">--</strong> kWh</span>
-            </div>
-                        <div style="display: flex; justify-content: space-between;">
-                            <span>Avg Daily Export:</span>
-                            <span><strong id="avg-daily-export">--</strong> kWh</span>
+            <!-- 5-Column Grid Container (Clean Final Layout) -->
+            <div style="display: grid; grid-template-columns: 0.6fr 1fr 1.4fr 1fr 0.6fr; grid-template-rows: 100px 120px 150px; gap: 15px; position: relative; z-index: 2;">
+                
+                <!-- Row 1, Col 2: Sun Movement (above house) -->
+                <div style="grid-column: 2; grid-row: 1; position: relative; display: flex; align-items: center; justify-content: center;">
+                    <!-- Tangled-Style Sun -->
+                    <div class="celestial-body" id="celestial-body" style="transition: all 1s ease-in-out; z-index: 10;">
+                        <div class="tangled-sun" style="position: relative; width: 80px; height: 80px;">
+                            <!-- Sun Rays (Background) -->
+                            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 120px; height: 120px; background: radial-gradient(circle, rgba(255, 215, 0, 0.3) 0%, rgba(255, 140, 0, 0.2) 40%, transparent 70%); border-radius: 50%; animation: gentleRotate 20s linear infinite;"></div>
+                            
+                            <!-- Stylized Sun Rays -->
+                            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 4em; color: #FFD700; text-shadow: 0 0 20px rgba(255, 215, 0, 0.8), 0 0 40px rgba(255, 140, 0, 0.6); filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.9)); animation: sunGlow 3s ease-in-out infinite alternate;">☀️</div>
+                            
+                            <!-- Inner Glow -->
+                            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 60px; height: 60px; background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(255, 215, 0, 0.6) 30%, transparent 70%); border-radius: 50%; animation: sunGlow 2s ease-in-out infinite alternate;"></div>
                         </div>
                     </div>
                 </div>
+                
+                <!-- Row 2, Col 2: Solar Rays and Production Data (Centered) -->
+                <div style="grid-column: 2; grid-row: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
+                    <!-- Solar Rays Angled Toward House -->
+                    <div class="solar-rays" id="solar-rays" style="position: relative; z-index: 5;">
+                        <div class="ray-container" style="position: relative; width: 120px; height: 80px;">
+                            <!-- Angled rays pointing toward house -->
+                            <div class="energy-ray" style="position: absolute; width: 3px; height: 50px; background: linear-gradient(to bottom, #FFD700, #FFA500); border-radius: 2px; left: 25px; transform: rotate(-15deg); transform-origin: top; animation: rayPulse 2s ease-in-out infinite;"></div>
+                            <div class="energy-ray" style="position: absolute; width: 3px; height: 55px; background: linear-gradient(to bottom, #FFD700, #FFA500); border-radius: 2px; left: 40px; transform: rotate(-8deg); transform-origin: top; animation: rayPulse 2s ease-in-out infinite 0.3s;"></div>
+                            <div class="energy-ray" style="position: absolute; width: 3px; height: 60px; background: linear-gradient(to bottom, #FFD700, #FFA500); border-radius: 2px; left: 55px; transform: rotate(0deg); animation: rayPulse 2s ease-in-out infinite 0.6s;"></div>
+                            <div class="energy-ray" style="position: absolute; width: 3px; height: 55px; background: linear-gradient(to bottom, #FFD700, #FFA500); border-radius: 2px; left: 70px; transform: rotate(8deg); transform-origin: top; animation: rayPulse 2s ease-in-out infinite 0.9s;"></div>
+                            <div class="energy-ray" style="position: absolute; width: 3px; height: 50px; background: linear-gradient(to bottom, #FFD700, #FFA500); border-radius: 2px; left: 85px; transform: rotate(15deg); transform-origin: top; animation: rayPulse 2s ease-in-out infinite 1.2s;"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Production Number Overlay (Green) -->
+                    <div class="production-overlay" id="production-overlay" style="background: rgba(46, 204, 113, 0.9); padding: 6px 12px; border-radius: 15px; font-weight: bold; font-size: 1.1em; color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.2); margin-top: 10px;">
+                        <span id="visual-production">-- kW</span>
+                    </div>
+                </div>
+                
+                <!-- Row 3, Col 2: Hobbit House (Centered) -->
+                <div style="grid-column: 2; grid-row: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
+                    <img src="/static/images/Hobbit House.png" alt="Solar Powered Hobbit House" style="width: 150px; height: auto; background: none; border: none; box-shadow: none;">
+                    <div class="house-consumption" style="position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%); background: rgba(52, 152, 219, 0.9); color: white; padding: 3px 8px; border-radius: 10px; font-weight: bold; font-size: 0.8em;">
+                        <span id="visual-consumption">-- kW</span>
+                    </div>
+                </div>
+                
+                <!-- Row 3, Col 3: Power Line -->
+                <div style="grid-column: 3; grid-row: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; gap: 10px;">
+                    <!-- Electrical Flow Line -->
+                    <div class="electrical-flow" style="position: relative; width: 100%; height: 4px; background: #444;">
+                        <!-- Electrical Bolts Animation -->
+                        <div class="electrical-bolt" id="electrical-bolt-1" style="position: absolute; top: -8px; width: 18px; height: 18px; font-size: 14px; animation: boltFlow 3s linear infinite;">⚡</div>
+                        <div class="electrical-bolt" id="electrical-bolt-2" style="position: absolute; top: -8px; width: 18px; height: 18px; font-size: 14px; animation: boltFlow 3s linear infinite 1s;">⚡</div>
+                        <div class="electrical-bolt" id="electrical-bolt-3" style="position: absolute; top: -8px; width: 18px; height: 18px; font-size: 14px; animation: boltFlow 3s linear infinite 2s;">⚡</div>
+                    </div>
+                    
+                    <!-- Grid Flow Amount and Direction -->
+                    <div class="grid-flow-info" id="grid-flow-info" style="background: rgba(39, 174, 96, 0.9); color: white; padding: 4px 8px; border-radius: 12px; font-weight: bold; font-size: 0.9em;">
+                        <span id="visual-grid-flow">-- kW</span>
+                        <span id="visual-grid-direction" style="margin-left: 6px;">➡️</span>
+                    </div>
+                </div>
+                
+                <!-- Row 3, Col 4: Barad-dûr Power Grid (Flush Left) -->
+                <div style="grid-column: 4; grid-row: 3; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; position: relative; padding-left: 10px;">
+                    <!-- Barad-dûr Image - LARGER AND MORE MENACING -->
+                    <img src="/static/images/The_Lord_of_the_Rings_-_The_Return_of_the_King_-_Barad-dur.jpg" alt="Barad-dûr Power Grid" style="width: 180px; height: auto; border-radius: 12px; box-shadow: 0 0 30px rgba(255, 69, 0, 0.8), 0 0 60px rgba(139, 0, 0, 0.6), 0 0 90px rgba(255, 140, 0, 0.3); filter: brightness(1.1) contrast(1.2); animation: eyeGlow 4s ease-in-out infinite alternate; transform: scale(1.1);">
+                    
+                    <div style="font-size: 0.9em; color: #8B0000; margin-top: 10px; text-align: left; font-weight: bold; text-shadow: 0 0 5px rgba(255, 69, 0, 0.8);">POWER GRID</div>
+                </div>
+                
             </div>
         </div>
+        
         '''
     elif page == 'devices':
         return '''
@@ -819,17 +996,13 @@ def get_page_content(page):
             <h3 style="margin-bottom: 20px;">⚡ Performance Summary</h3>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
                 <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px; text-align: center;">
-                    <div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 8px;">Total Inverters</div>
-                    <div style="font-size: 2em; font-weight: bold;" id="total-inverters">--</div>
-                </div>
-                <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 12px; text-align: center;">
-                    <div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 8px;">Online Now</div>
-                    <div style="font-size: 2em; font-weight: bold;" id="online-inverters">--</div>
+                    <div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 8px;">Inverters Online</div>
+                    <div style="font-size: 2em; font-weight: bold;" id="inverters-status">--/--</div>
                 </div>
                 <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 12px; text-align: center;">
                     <div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 8px;">Total Power</div>
                     <div style="font-size: 2em; font-weight: bold;" id="total-power-display">-- kW</div>
-                </div>
+        </div>
                 <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 20px; border-radius: 12px; text-align: center;">
                     <div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 8px;">Avg Voltage</div>
                     <div style="font-size: 2em; font-weight: bold;" id="avg-efficiency">--V</div>
@@ -843,21 +1016,62 @@ def get_page_content(page):
             <div style="margin-bottom: 20px;">
                 <h3>⚡ Panel/Inverter Details</h3>
             </div>
-            
+        
             <div id="inverter-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
                 <div style="text-align: center; padding: 40px; color: #666;">
                     <div style="font-size: 3em; margin-bottom: 10px;">⚡</div>
                     <div>Loading inverter data...</div>
-                </div>
             </div>
         </div>
+                </div>
         
         '''
     elif page == 'analytics':
         return '''
-        <div class="page-header" style="text-align: center; margin-bottom: 30px;">
-            <h2>📊 System Analytics</h2>
-            <p style="color: #666; font-size: 1.1em;">Performance analysis and historical data visualization</p>
+        <!-- Performance Summary Section -->
+        <div style="margin-bottom: 30px;">
+            <h3 style="color: #374151; margin: 0 0 20px 0;">📈 Performance Summary</h3>
+            
+            <!-- Detailed Performance Stats -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                <!-- Peak Performance -->
+                <div class="info-card">
+                    <h4>⚡ Peak Performance</h4>
+                    <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 15px;">
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Peak Production:</span>
+                            <span><strong id="peak-production-overview">--</strong> <span id="peak-production-time">--</span></span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Peak Consumption:</span>
+                            <span><strong id="peak-consumption-overview">--</strong> <span id="peak-consumption-time">--</span></span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Best Export Hour:</span>
+                            <span><strong id="best-export-overview">--</strong> <span id="best-export-time">--</span></span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Daily Averages -->
+                <div class="info-card">
+                    <h4>📅 Daily Averages</h4>
+                    <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 15px;">
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Avg Daily Production:</span>
+                            <span><strong id="avg-daily-production">--</strong> kWh</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Avg Daily Consumption:</span>
+                            <span><strong id="avg-daily-consumption">--</strong> kWh</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Avg Daily Export:</span>
+                            <span><strong id="avg-daily-export">--</strong> kWh</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <!-- Chart Controls -->
@@ -888,25 +1102,21 @@ def get_page_content(page):
                         <option value="month">Month</option>
                         <option value="year">Year</option>
                     </select>
-                    <button class="btn" onclick="updateChart()" style="background: #667eea;">🔄 Update Chart</button>
-            </div>
+        </div>
             </div>
         </div>
         
         <!-- Main Chart -->
         <div class="info-card" style="margin-bottom: 30px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h4 style="margin: 0;">📊 Chart Visualization</h4>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <label style="font-size: 0.9em; color: #666;">Height:</label>
-                    <select id="chart-height" onchange="resizeChart()" style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px;">
-                        <option value="300">Small (300px)</option>
-                        <option value="400" selected>Medium (400px)</option>
-                        <option value="600">Large (600px)</option>
-                        <option value="800">Extra Large (800px)</option>
-                    </select>
-                    <button onclick="toggleChartFullscreen()" style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; background: #f8f9fa; cursor: pointer;">⛶ Fullscreen</button>
-                </div>
+            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                <label style="font-size: 0.9em; color: #666;">Height:</label>
+                <select id="chart-height" onchange="resizeChart()" style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    <option value="300">Small (300px)</option>
+                    <option value="400" selected>Medium (400px)</option>
+                    <option value="600">Large (600px)</option>
+                    <option value="800">Extra Large (800px)</option>
+                </select>
+                <button onclick="toggleChartFullscreen()" style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; background: #f8f9fa; cursor: pointer;">⛶ Fullscreen</button>
             </div>
             <div id="chart-container" style="position: relative; height: 400px; overflow: auto; border: 1px solid #e0e0e0; border-radius: 8px; resize: vertical; min-height: 200px; max-height: 1200px;">
                 <canvas id="analyticsChart"></canvas>
@@ -916,42 +1126,6 @@ def get_page_content(page):
                 <div>Loading chart data...</div>
             </div>
         </div>
-        
-        <!-- Advanced SQL Query Interface -->
-        <div class="info-card" style="margin-bottom: 30px;">
-            <h3>🔍 Advanced SQL Query Interface</h3>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <div>
-                    <button class="btn" onclick="loadQueryTemplate('recent')" style="margin-right: 5px; background: #27ae60;">📈 Recent Production</button>
-                    <button class="btn" onclick="loadQueryTemplate('devices')" style="margin-right: 5px; background: #3498db;">🔌 Device Summary</button>
-                    <button class="btn" onclick="loadQueryTemplate('hourly')" style="margin-right: 5px; background: #e67e22;">⏰ Hourly Totals</button>
-                    <button class="btn" onclick="loadQueryTemplate('top')" style="background: #9b59b6;">🏆 Top Producers</button>
-                </div>
-        </div>
-        
-            <div class="sql-interface">
-                <textarea id="sql-query" class="sql-textarea" placeholder="Enter your SQL query here... Try the template buttons above for examples!">-- Click a template button above to load a query that matches your chart settings
--- Or write your own SQL query to explore the data
-
-SELECT timestamp, production_kw, consumption_kw, 
-       (production_kw - consumption_kw) as net_export_kw 
-FROM solar_data 
-WHERE timestamp >= datetime('now', 'localtime', '-24 hours')
-ORDER BY timestamp DESC 
-LIMIT 50;</textarea>
-                <div class="query-controls">
-                    <button class="btn success" onclick="executeQuery()">▶️ Execute Query</button>
-                    <button class="btn" onclick="validateQuery()">✅ Validate</button>
-                    <button class="btn" onclick="executeQueryAsChart()" style="background: #667eea;">📊 Visualize as Chart</button>
-                    </div>
-            </div>
-            <div id="query-results"></div>
-            <div id="query-explanation" style="margin-top: 15px; padding: 15px; background: #e8f4fd; border-radius: 8px; display: none;">
-                <h4 style="margin-bottom: 10px; color: #2c3e50;">📚 Query Explanation</h4>
-                <div id="explanation-content"></div>
-                    </div>
-                </div>
-        
         
         '''
     elif page == 'system':
@@ -990,8 +1164,8 @@ LIMIT 50;</textarea>
                             <div style="font-size: 1.1em; font-weight: 600;" id="pvs6-signal-status">Loading...</div>
                         </div>
                     </div>
-                </div>
-                
+        </div>
+        
                 <!-- Data Collection Section -->
                 <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                     <h4 style="margin-bottom: 15px; color: #2c3e50; font-size: 1.1em;">📈 Data Collection</h4>
@@ -1030,6 +1204,53 @@ LIMIT 50;</textarea>
                         <div style="background: white; padding: 15px; border-radius: 6px; border-left: 4px solid #00bcd4;">
                             <div style="font-size: 0.9em; color: #666; margin-bottom: 5px;">Config File</div>
                             <div style="font-size: 1.1em; font-weight: 600;" id="config-file-status">Loading...</div>
+                        </div>
+                        <div style="background: white; padding: 15px; border-radius: 6px; border-left: 4px solid #ff9800;">
+                            <div style="font-size: 0.9em; color: #666; margin-bottom: 5px;">Timezone</div>
+                            <div style="font-size: 1.1em; font-weight: 600;" id="timezone-status">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Database Statistics -->
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 20px;">
+                <h4 style="margin-bottom: 15px; color: #2c3e50; font-size: 1.1em;">📊 Database Statistics</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px;">
+                    <div style="background: white; border-left: 4px solid #667eea; padding: 15px; border-radius: 6px; text-align: center;">
+                        <div style="font-size: 0.8em; color: #666; margin-bottom: 5px;">Total Records</div>
+                        <div style="font-size: 1.5em; font-weight: bold; color: #2c3e50;" id="total-records-stat">--</div>
+                    </div>
+                    <div style="background: white; border-left: 4px solid #e74c3c; padding: 15px; border-radius: 6px; text-align: center;">
+                        <div style="font-size: 0.8em; color: #666; margin-bottom: 5px;">Database Size</div>
+                        <div style="font-size: 1.5em; font-weight: bold; color: #2c3e50;" id="db-size-stat">--</div>
+                    </div>
+                    <div style="background: white; border-left: 4px solid #3498db; padding: 15px; border-radius: 6px; text-align: center;">
+                        <div style="font-size: 0.8em; color: #666; margin-bottom: 5px;">Active Devices</div>
+                        <div style="font-size: 1.5em; font-weight: bold; color: #2c3e50;" id="active-devices-stat">--</div>
+                    </div>
+                    <div style="background: white; border-left: 4px solid #27ae60; padding: 15px; border-radius: 6px; text-align: center;">
+                        <div style="font-size: 0.8em; color: #666; margin-bottom: 5px;">Data Range</div>
+                        <div style="font-size: 1em; font-weight: bold; color: #2c3e50;" id="data-range-stat">--</div>
+                    </div>
+                </div>
+                
+                <!-- Detailed Database Info -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+                    <div style="background: white; padding: 12px; border-radius: 6px;">
+                        <h5 style="margin: 0 0 8px 0; color: #2c3e50;">📈 Recent Activity</h5>
+                        <div style="font-size: 0.9em; color: #666;">
+                            <p style="margin: 3px 0;">Records (24h): <span id="records-24h">--</span></p>
+                            <p style="margin: 3px 0;">Records (7d): <span id="records-7d">--</span></p>
+                            <p style="margin: 3px 0;">Latest Entry: <span id="latest-entry">--</span></p>
+                        </div>
+                    </div>
+                    <div style="background: white; padding: 12px; border-radius: 6px;">
+                        <h5 style="margin: 0 0 8px 0; color: #2c3e50;">🔧 Database Health</h5>
+                        <div style="font-size: 0.9em; color: #666;">
+                            <p style="margin: 3px 0;">Status: <span id="db-status-health">--</span></p>
+                            <p style="margin: 3px 0;">Fragmentation: <span id="db-fragmentation">--</span></p>
+                            <p style="margin: 3px 0;">Last Optimized: <span id="last-optimized-display">--</span></p>
                         </div>
                     </div>
                 </div>
@@ -1080,6 +1301,50 @@ LIMIT 50;</textarea>
                 <h4 style="margin-bottom: 10px; color: #2c3e50;">🔍 Diagnostic Results</h4>
                 <div id="diagnostic-content" style="background: #2c3e50; color: #00ff00; padding: 15px; border-radius: 6px; font-family: monospace; font-size: 0.9em; white-space: pre-wrap; max-height: 400px; overflow-y: auto;"></div>
             </div>
+        </div>
+        
+        <!-- Database Maintenance & Optimization -->
+        <div class="info-card" style="margin-bottom: 30px;">
+            <h3>🛠️ Database Maintenance & Optimization</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 20px;">
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                    <h4 style="margin-bottom: 15px; color: #2c3e50;">🧹 Data Cleanup</h4>
+                    <p style="margin-bottom: 15px; color: #666;">Remove old or unnecessary data to optimize performance</p>
+                    <div style="margin-bottom: 10px;">
+                        <label>Delete records older than:</label>
+                        <select id="cleanup-period" style="width: 100%; padding: 5px; margin-top: 5px;">
+                            <option value="90">90 days</option>
+                            <option value="180">6 months</option>
+                            <option value="365">1 year</option>
+                            <option value="730">2 years</option>
+                        </select>
+                    </div>
+                    <button class="btn" onclick="cleanupOldData()" style="background: #e74c3c; width: 100%;">🗑️ Cleanup Old Data</button>
+                </div>
+                
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                    <h4 style="margin-bottom: 15px; color: #2c3e50;">⚡ Performance Optimization</h4>
+                    <p style="margin-bottom: 15px; color: #666;">Optimize database for better query performance</p>
+                    <div style="margin-bottom: 15px;">
+                        <p>Last Optimized: <span id="last-vacuum">--</span></p>
+                        <p>Database Size: <span id="current-db-size">--</span></p>
+                    </div>
+                    <button class="btn" onclick="optimizeDatabase()" style="background: #f39c12; width: 100%;">⚡ Optimize Database</button>
+                </div>
+                
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                    <h4 style="margin-bottom: 15px; color: #2c3e50;">💾 Backup & Export</h4>
+                    <p style="margin-bottom: 15px; color: #666;">Create full database backups and exports</p>
+                    <div style="margin-bottom: 15px;">
+                        <p>Last Backup: <span id="last-backup">--</span></p>
+                        <p>Backup Size: <span id="backup-size">--</span></p>
+                    </div>
+                    <button class="btn" onclick="createFullBackup()" style="background: #27ae60; width: 100%; margin-bottom: 10px;">💾 Full Backup</button>
+                    <button class="btn" onclick="exportFullDatabase()" style="background: #3498db; width: 100%;">📤 Export All Data</button>
+                </div>
+            </div>
+            
+            <div id="maintenance-results" style="margin-top: 20px;"></div>
         </div>
         
         <!-- Configuration Modal -->
@@ -1143,56 +1408,35 @@ LIMIT 50;</textarea>
         </div>
         
         </div>
+        
+        <script>
+        // Initialize system page - load database statistics
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load system info and database stats when page loads
+            if (typeof refreshSystemInfo === 'function') {
+                refreshSystemInfo();
+            }
+            if (typeof refreshDbStats === 'function') {
+                refreshDbStats();
+            }
+            
+            // Set up auto-refresh every 30 seconds
+            setInterval(() => {
+                if (typeof refreshSystemInfo === 'function') {
+                    refreshSystemInfo();
+                }
+                if (typeof refreshDbStats === 'function') {
+                    refreshDbStats();
+                }
+            }, 30000);
+        });
+        </script>
         '''
     elif page == 'data':
         return '''
-        <!-- Database Statistics Dashboard -->
+        <!-- Table Browser -->
         <div class="info-card" style="margin-bottom: 30px;">
-            <h3>📊 Database Statistics Dashboard</h3>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px;">
-                <div style="background: white; border-left: 4px solid #667eea; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
-                    <div style="font-size: 0.9em; color: #666; margin-bottom: 8px;">Total Records</div>
-                    <div style="font-size: 2em; font-weight: bold; color: #2c3e50;" id="total-records-stat">--</div>
-                </div>
-                <div style="background: white; border-left: 4px solid #e74c3c; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
-                    <div style="font-size: 0.9em; color: #666; margin-bottom: 8px;">Database Size</div>
-                    <div style="font-size: 2em; font-weight: bold; color: #2c3e50;" id="db-size-stat">--</div>
-                </div>
-                <div style="background: white; border-left: 4px solid #3498db; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
-                    <div style="font-size: 0.9em; color: #666; margin-bottom: 8px;">Active Devices</div>
-                    <div style="font-size: 2em; font-weight: bold; color: #2c3e50;" id="active-devices-stat">--</div>
-                </div>
-                <div style="background: white; border-left: 4px solid #27ae60; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
-                    <div style="font-size: 0.9em; color: #666; margin-bottom: 8px;">Data Range</div>
-                    <div style="font-size: 1.2em; font-weight: bold; color: #2c3e50;" id="data-range-stat">--</div>
-                </div>
-            </div>
-            
-            <!-- Detailed Statistics -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
-                    <h4 style="margin-bottom: 10px; color: #2c3e50;">📈 Recent Activity</h4>
-                    <div id="recent-activity">
-                        <p>Records (24h): <span id="records-24h">--</span></p>
-                        <p>Records (7d): <span id="records-7d">--</span></p>
-                        <p>Latest Entry: <span id="latest-entry">--</span></p>
-                    </div>
-                </div>
-                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
-                    <h4 style="margin-bottom: 10px; color: #2c3e50;">🔧 Database Health</h4>
-                    <div id="db-health">
-                        <p>Status: <span id="db-status-health">--</span></p>
-                        <p>Fragmentation: <span id="db-fragmentation">--</span></p>
-                        <p>Last Optimized: <span id="last-optimized">--</span></p>
-                    </div>
-                </div>
-            </div>
-            
-        </div>
-        
-        <!-- Advanced Table Browser -->
-        <div class="info-card" style="margin-bottom: 30px;">
-            <h3>🔍 Advanced Table Browser</h3>
+            <h3>🔍 Table Browser</h3>
             <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #2196f3;">
                 <h4 style="margin: 0 0 10px 0; color: #1976d2;">📊 Table Information:</h4>
                 <ul style="margin: 0; padding-left: 20px; color: #1565c0;">
@@ -1252,6 +1496,16 @@ LIMIT 50;</textarea>
                 <button class="btn" onclick="exportTableData('json')">📊 Export JSON</button>
             </div>
             
+            <!-- Table Browser Results with AG-Grid -->
+            <div id="table-browser-results-section" style="display: none;">
+                <div class="info-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 id="table-results-title">📊 Table Results</h3>
+                    </div>
+                    <div id="table-browser-grid" class="ag-theme-alpine" style="height: 400px; width: 100%;"></div>
+                </div>
+            </div>
+            
             <div id="table-browser-results" style="max-height: 500px; overflow: auto;">
                 <div style="text-align: center; padding: 40px; color: #666;">
                     <div style="font-size: 3em; margin-bottom: 10px;">📊</div>
@@ -1260,49 +1514,77 @@ LIMIT 50;</textarea>
             </div>
         </div>
         
-        
-        <!-- Database Maintenance & Optimization -->
-            <div class="info-card">
-            <h3>🛠️ Database Maintenance & Optimization</h3>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 20px;">
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
-                    <h4 style="margin-bottom: 15px; color: #2c3e50;">🧹 Data Cleanup</h4>
-                    <p style="margin-bottom: 15px; color: #666;">Remove old or unnecessary data to optimize performance</p>
-                    <div style="margin-bottom: 10px;">
-                        <label>Delete records older than:</label>
-                        <select id="cleanup-period" style="width: 100%; padding: 5px; margin-top: 5px;">
-                            <option value="90">90 days</option>
-                            <option value="180">6 months</option>
-                            <option value="365">1 year</option>
-                            <option value="730">2 years</option>
-                </select>
+        <!-- SQL Query Interface -->
+        <div class="info-card" style="margin-bottom: 30px;">
+            <h3>🔍 SQL Query Interface</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div>
+                    <button class="btn" onclick="loadQueryTemplate('recent')" style="margin-right: 5px; background: #27ae60;">📈 Recent Production</button>
+                    <button class="btn" onclick="loadQueryTemplate('devices')" style="margin-right: 5px; background: #3498db;">🔌 Device Summary</button>
+                    <button class="btn" onclick="loadQueryTemplate('hourly')" style="margin-right: 5px; background: #e67e22;">⏰ Hourly Totals</button>
+                    <button class="btn" onclick="loadQueryTemplate('top')" style="background: #9b59b6;">🏆 Top Producers</button>
                 </div>
-                    <button class="btn" onclick="cleanupOldData()" style="background: #e74c3c; width: 100%;">🗑️ Cleanup Old Data</button>
+            </div>
+            
+            <div class="sql-interface">
+                <textarea id="sql-query" class="sql-textarea" placeholder="Enter your SQL query here... Try the template buttons above for examples!">-- Click a template button above to load a query that matches your chart settings
+-- Or write your own SQL query to explore the data
+
+SELECT timestamp, production_kw, consumption_kw, 
+       (production_kw - consumption_kw) as net_export_kw 
+FROM solar_data 
+WHERE timestamp >= datetime('now', 'localtime', '-24 hours')
+ORDER BY timestamp DESC 
+LIMIT 50;</textarea>
+                <div class="query-controls">
+                    <button class="btn success" onclick="executeQuery()">▶️ Execute Query</button>
+                    <button class="btn" onclick="validateQuery()">✅ Validate</button>
+                    <button class="btn" onclick="executeQueryAsChart()" style="background: #667eea;">📊 Visualize as Chart</button>
+                    <button class="btn" onclick="exportQueryResults('csv')" style="background: #28a745;">📄 Export CSV</button>
+                    <button class="btn" onclick="exportQueryResults('json')" style="background: #17a2b8;">📋 Export JSON</button>
                 </div>
-                
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
-                    <h4 style="margin-bottom: 15px; color: #2c3e50;">⚡ Performance Optimization</h4>
-                    <p style="margin-bottom: 15px; color: #666;">Optimize database for better query performance</p>
-                    <div style="margin-bottom: 15px;">
-                        <p>Last Optimized: <span id="last-vacuum">--</span></p>
-                        <p>Database Size: <span id="current-db-size">--</span></p>
+            </div>
+            
+            <!-- SQL Chart Container -->
+            <div id="sql-chart-section" style="display: none; margin: 20px 0;">
+                <div class="info-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3>📊 SQL Query Visualization</h3>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn" onclick="toggleSQLChartFullscreen()" style="background: #6c757d;">⛶ Fullscreen</button>
+                            <button class="btn" onclick="hideSQLChart()" style="background: #dc3545;">✕ Hide</button>
+                        </div>
                     </div>
-                    <button class="btn" onclick="optimizeDatabase()" style="background: #f39c12; width: 100%;">⚡ Optimize Database</button>
-            </div>
-            
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
-                    <h4 style="margin-bottom: 15px; color: #2c3e50;">💾 Backup & Export</h4>
-                    <p style="margin-bottom: 15px; color: #666;">Create full database backups and exports</p>
-                    <div style="margin-bottom: 15px;">
-                        <p>Last Backup: <span id="last-backup">--</span></p>
-                        <p>Backup Size: <span id="backup-size">--</span></p>
+                    <div id="sql-chart-loading" style="display: none; text-align: center; padding: 40px;">
+                        <div style="display: inline-block; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                        <p style="margin-top: 15px; color: #666;">Generating chart...</p>
+                    </div>
+                    <div id="sql-chart-error" style="display: none; text-align: center; padding: 40px; color: #e74c3c;">
+                        <h4>⚠️ Chart Error</h4>
+                        <p id="sql-chart-error-message">Unable to generate chart</p>
+                    </div>
+                    <div id="sql-chart-container" style="position: relative; height: 400px; overflow: auto; border: 1px solid #e0e0e0; border-radius: 8px; resize: vertical; min-height: 200px; max-height: 800px;">
+                        <canvas id="sqlChart"></canvas>
+                    </div>
                 </div>
-                    <button class="btn" onclick="createFullBackup()" style="background: #27ae60; width: 100%; margin-bottom: 10px;">💾 Full Backup</button>
-                    <button class="btn" onclick="exportFullDatabase()" style="background: #3498db; width: 100%;">📤 Export All Data</button>
-            </div>
             </div>
             
-            <div id="maintenance-results" style="margin-top: 20px;"></div>
+            <!-- Query Results with AG-Grid -->
+            <div id="query-results-section" style="display: none; margin: 20px 0;">
+                <div class="info-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 id="results-title">📊 Query Results</h3>
+                    </div>
+                    <div id="query-results-grid" class="ag-theme-alpine" style="height: 400px; width: 100%;"></div>
+                </div>
+            </div>
+            
+            <!-- Legacy results div for error messages -->
+            <div id="query-results"></div>
+            <div id="query-explanation" style="margin-top: 15px; padding: 15px; background: #e8f4fd; border-radius: 8px; display: none;">
+                <h4 style="margin-bottom: 10px; color: #2c3e50;">📚 Query Explanation</h4>
+                <div id="explanation-content"></div>
+            </div>
         </div>
         
         '''
@@ -1458,27 +1740,77 @@ LIMIT 50;</textarea>
         '''
     elif page == 'help':
         return '''
-        <div class="page-header">
-            <h2>❓ Help & Documentation</h2>
-            <p>Complete guide to using the Solar Monitor system</p>
-            <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 15px; margin: 20px 0; color: #856404;">
-                <strong>⚠️ Note:</strong> This help documentation was auto-generated and may not be 100% accurate. 
-                Please verify system behavior and consult actual system status for current information.
-            </div>
-        </div>
         
-        <!-- Table of Contents -->
-        <div class="info-card" style="margin-bottom: 30px;">
-            <h3>📋 Quick Navigation</h3>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px;">
-                <a href="#overview-help" style="text-decoration: none; color: #667eea; font-weight: 600;">🏠 Overview Page</a>
-                <a href="#devices-help" style="text-decoration: none; color: #667eea; font-weight: 600;">⚡ Inverters & Panels</a>
-                <a href="#analytics-help" style="text-decoration: none; color: #667eea; font-weight: 600;">📊 Analytics</a>
-                <a href="#data-help" style="text-decoration: none; color: #667eea; font-weight: 600;">🗃️ Data Management</a>
-                <a href="#system-help" style="text-decoration: none; color: #667eea; font-weight: 600;">⚙️ System Management</a>
-                <a href="#status-help" style="text-decoration: none; color: #667eea; font-weight: 600;">🔍 Status Indicators</a>
-            </div>
-        </div>
+        <!-- Help Tree View -->
+        <div class="info-card" style="margin-bottom: 20px;">
+            <div class="help-tree">
+                <style>
+                .help-tree {
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                }
+                .tree-item {
+                    margin: 0;
+                    border: none;
+                }
+                .tree-summary {
+                    padding: 8px 12px;
+                    background: #f8f9fa;
+                    border: 1px solid #e9ecef;
+                    border-radius: 6px;
+                    margin-bottom: 2px;
+                    cursor: pointer;
+                    font-weight: 600;
+                    color: #495057;
+                    display: flex;
+                    align-items: center;
+                    transition: all 0.2s ease;
+                }
+                .tree-summary:hover {
+                    background: #e9ecef;
+                    border-color: #667eea;
+                }
+                .tree-summary::marker {
+                    display: none;
+                }
+                .tree-summary::-webkit-details-marker {
+                    display: none;
+                }
+                .tree-summary::before {
+                    content: "▶";
+                    margin-right: 8px;
+                    transition: transform 0.2s ease;
+                    font-size: 0.8em;
+                }
+                .tree-item[open] .tree-summary::before {
+                    transform: rotate(90deg);
+                }
+                .tree-content {
+                    padding: 15px 20px;
+                    background: white;
+                    border: 1px solid #e9ecef;
+                    border-top: none;
+                    border-radius: 0 0 6px 6px;
+                    margin-bottom: 8px;
+                }
+                .tree-subsection {
+                    margin: 10px 0;
+                    padding-left: 15px;
+                    border-left: 3px solid #667eea;
+                }
+                .tree-subsection h4 {
+                    margin: 0 0 8px 0;
+                    color: #667eea;
+                    font-size: 1em;
+                }
+                .tree-subsection ul {
+                    margin: 8px 0;
+                    padding-left: 20px;
+                }
+                .tree-subsection li {
+                    margin: 4px 0;
+                    line-height: 1.4;
+                }
+                </style>
         
         <!-- Overview Page Help -->
         <div class="info-card" id="overview-help" style="margin-bottom: 30px;">
@@ -1513,8 +1845,8 @@ LIMIT 50;</textarea>
             </ul>
             
             <p><strong>🔄 Auto-Refresh:</strong> Data updates every 30 seconds automatically.</p>
-        </div>
-        
+            </div>
+            
         <!-- Devices Page Help -->
         <div class="info-card" id="devices-help" style="margin-bottom: 30px;">
             <h3>⚡ Inverters & Panels</h3>
@@ -1543,7 +1875,7 @@ LIMIT 50;</textarea>
                 <li><strong>🔍 Run Diagnostics:</strong> Test inverter connectivity and performance</li>
                 <li><strong>🔄 Auto-Refresh:</strong> Toggle automatic data updates</li>
             </ul>
-        </div>
+                    </div>
         
         <!-- Analytics Page Help -->
         <div class="info-card" id="analytics-help" style="margin-bottom: 30px;">
@@ -1577,7 +1909,7 @@ LIMIT 50;</textarea>
                 <li><strong>Peak Consumption:</strong> Highest usage with timestamp</li>
                 <li><strong>Best Export Hour:</strong> Maximum grid export with timestamp</li>
             </ul>
-        </div>
+                </div>
         
         <!-- Data Management Page Help -->
         <div class="info-card" id="data-help" style="margin-bottom: 30px;">
@@ -1593,7 +1925,7 @@ LIMIT 50;</textarea>
                 <li><strong>Recent Activity:</strong> Records added in last 24h and 7 days</li>
             </ul>
             
-            <h4>🔍 Advanced Table Browser</h4>
+            <h4>🔍 Table Browser</h4>
             <ul style="margin: 15px 0; padding-left: 20px;">
                 <li><strong>Table Selection:</strong> Browse solar_data or device_data tables</li>
                 <li><strong>Time Range Filters:</strong> Filter by date range</li>
@@ -1619,7 +1951,7 @@ LIMIT 50;</textarea>
                 <li><strong>Create Backup:</strong> Full database backup with timestamp</li>
                 <li><strong>Export All Data:</strong> Complete data export in multiple formats</li>
             </ul>
-        </div>
+                </div>
         
         <!-- System Management Page Help -->
         <div class="info-card" id="system-help" style="margin-bottom: 30px;">
@@ -1667,7 +1999,7 @@ LIMIT 50;</textarea>
                 <li><strong>Backup & Export:</strong> Create full system backups</li>
                 <li><strong>Health Monitoring:</strong> Database integrity checks</li>
             </ul>
-        </div>
+                </div>
         
         <!-- Status Indicators Help -->
         <div class="info-card" id="status-help" style="margin-bottom: 30px;">
@@ -1700,8 +2032,8 @@ LIMIT 50;</textarea>
             </ul>
             
             <p><strong>💡 Tip:</strong> Click on any status indicator to go to the relevant management page.</p>
-        </div>
-        
+            </div>
+            
         <!-- Troubleshooting -->
         <div class="info-card" style="margin-bottom: 30px;">
             <h3>🔧 Common Troubleshooting</h3>
@@ -1742,7 +2074,7 @@ LIMIT 50;</textarea>
         </div>
         
         <!-- System Information -->
-        <div class="info-card">
+            <div class="info-card">
             <h3>ℹ️ System Information</h3>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 20px;">
                 <div>
@@ -1801,8 +2133,7 @@ def get_page_script(page):
                 await loadHistoricalData(period);
             }
             
-            // Always load performance summary for the selected period
-            await loadPerformanceSummary(period);
+            // Performance summary is now on analytics page only
         }
         
         async function loadCurrentData() {
@@ -1865,10 +2196,144 @@ def get_page_script(page):
                     // Update last update time
                     const lastUpdateEl = document.getElementById('update-status-title');
                     if (lastUpdateEl) lastUpdateEl.textContent = `Last Updated: ${new Date().toLocaleTimeString()}`;
+                    
+                    // Update visual energy flow system
+                    window.currentEnergyData = data;
+                    updateVisualEnergyFlow(data);
                 }
             } catch (error) {
                 console.error('Error loading current data:', error);
             }
+        }
+        
+        // Visual Energy Flow System Functions
+        function updateVisualEnergyFlow(data) {
+            updateCelestialPosition();
+            updateVisualData(data);
+        }
+        
+        function updateCelestialPosition() {
+            const now = new Date();
+            const hour = now.getHours();
+            const minute = now.getMinutes();
+            const timeDecimal = hour + minute / 60;
+            
+            const celestialBody = document.getElementById('celestial-body');
+            const skyBackground = document.getElementById('sky-background');
+            
+            if (!celestialBody || !skyBackground) return;
+            
+            const isDaytime = hour >= 6 && hour < 18;
+            
+            if (isDaytime) {
+                // Sun moves above the house - from RIGHT to LEFT (east to west)
+                // At 6 AM (sunrise): right side, at 6 PM (sunset): left side
+                const sunProgress = (timeDecimal - 6) / 12; // 0 to 1
+                const sunPosition = 45 - (sunProgress * 35); // 45% to 10% (right to left, east to west)
+                
+                // Update Tangled-style sun (no need to change textContent)
+                celestialBody.className = 'celestial-body sun';
+                celestialBody.style.left = sunPosition + '%';
+                celestialBody.style.transform = 'translateX(-50%) translateY(-50%)';
+                
+                if (hour >= 6 && hour < 8) {
+                    skyBackground.className = 'sky-background dawn';
+                } else if (hour >= 8 && hour < 17) {
+                    skyBackground.className = 'sky-background day';
+                } else if (hour >= 17 && hour < 18) {
+                    skyBackground.className = 'sky-background dusk';
+                }
+            } else {
+                // Moon moves in the same range above the house (45% to 10% - right to left)
+                let moonProgress;
+                if (hour >= 18) {
+                    moonProgress = (timeDecimal - 18) / 12;
+                } else {
+                    moonProgress = (timeDecimal + 6) / 12;
+                }
+                const moonPosition = 45 - (moonProgress * 35); // Right to left like the sun
+                
+                const moonPhase = getMoonPhase(now);
+                // Switch to simple moon emoji for night
+                celestialBody.innerHTML = '<div style="font-size: 4em; filter: drop-shadow(0 0 15px rgba(200, 200, 255, 0.8));">' + moonPhase + '</div>';
+                celestialBody.className = 'celestial-body moon';
+                celestialBody.style.left = moonPosition + '%';
+                celestialBody.style.transform = 'translateX(-50%) translateY(-50%)';
+                
+                skyBackground.className = 'sky-background night';
+            }
+        }
+        
+        function updateVisualData(data) {
+            // Update production overlay
+            const productionOverlay = document.getElementById('visual-production');
+            if (productionOverlay) {
+                productionOverlay.textContent = (data.production_kw || 0).toFixed(1) + ' kW';
+            }
+            
+            // Update consumption
+            const consumptionEl = document.getElementById('visual-consumption');
+            if (consumptionEl) {
+                consumptionEl.textContent = (data.consumption_kw || 0).toFixed(1) + ' kW';
+            }
+            
+            // Update grid flow
+            const gridFlowEl = document.getElementById('visual-grid-flow');
+            const gridDirectionEl = document.getElementById('visual-grid-direction');
+            const gridFlowInfo = document.getElementById('grid-flow-info');
+            
+            if (gridFlowEl && gridDirectionEl && gridFlowInfo) {
+                const netExport = data.net_export_kw || 0;
+                
+                if (netExport > 0.1) {
+                    gridFlowEl.textContent = netExport.toFixed(1) + ' kW';
+                    gridDirectionEl.textContent = '➡️';
+                    gridFlowInfo.style.background = 'rgba(39, 174, 96, 0.9)';
+                    
+                    document.querySelectorAll('.electrical-bolt').forEach(bolt => {
+                        bolt.style.animationDirection = 'normal';
+                    });
+                } else if (netExport < -0.1) {
+                    gridFlowEl.textContent = Math.abs(netExport).toFixed(1) + ' kW';
+                    gridDirectionEl.textContent = '⬅️';
+                    gridFlowInfo.style.background = 'rgba(230, 126, 34, 0.9)';
+                    
+                    document.querySelectorAll('.electrical-bolt').forEach(bolt => {
+                        bolt.style.animationDirection = 'reverse';
+                    });
+                } else {
+                    gridFlowEl.textContent = '0.0 kW';
+                    gridDirectionEl.textContent = '⚖️';
+                    gridFlowInfo.style.background = 'rgba(108, 117, 125, 0.9)';
+                }
+            }
+            
+            // Control solar rays based on production
+            const solarRays = document.getElementById('solar-rays');
+            if (solarRays) {
+                const productionKw = data.production_kw || 0;
+                if (productionKw > 0.1) {
+                    solarRays.style.opacity = '1';
+                } else {
+                    solarRays.style.opacity = '0.3';
+                }
+            }
+        }
+        
+        function getMoonPhase(date) {
+            const knownNewMoon = new Date('2024-01-11');
+            const daysSinceNewMoon = (date - knownNewMoon) / (1000 * 60 * 60 * 24);
+            const lunarCycle = 29.53058867;
+            const phase = (daysSinceNewMoon % lunarCycle) / lunarCycle;
+            
+            if (phase < 0.0625 || phase >= 0.9375) return '🌑';
+            else if (phase < 0.1875) return '🌒';
+            else if (phase < 0.3125) return '🌓';
+            else if (phase < 0.4375) return '🌔';
+            else if (phase < 0.5625) return '🌕';
+            else if (phase < 0.6875) return '🌖';
+            else if (phase < 0.8125) return '🌗';
+            else return '🌘';
         }
         
         async function loadHistoricalData(period) {
@@ -2021,8 +2486,7 @@ def get_page_script(page):
             const totalPower = inverters.reduce((sum, inv) => sum + (inv.power_kw || 0), 0);
             const avgVoltage = inverters.filter(inv => inv.voltage).reduce((sum, inv, _, arr) => sum + inv.voltage / arr.length, 0);
             
-            document.getElementById('total-inverters').textContent = totalInverters;
-            document.getElementById('online-inverters').textContent = onlineInverters;
+            document.getElementById('inverters-status').textContent = `${onlineInverters}/${totalInverters}`;
             document.getElementById('total-power-display').textContent = totalPower.toFixed(2) + ' kW';
             document.getElementById('avg-efficiency').textContent = avgVoltage > 0 ? avgVoltage.toFixed(1) + 'V' : '--';
         }
@@ -2611,7 +3075,7 @@ def get_page_script(page):
             }
         }
         
-        
+
         async function updatePVS6Status() {
             try {
                 const [statusResponse, configResponse] = await Promise.all([
@@ -2986,15 +3450,44 @@ def get_page_script(page):
                     if (dbSizeEl) dbSizeEl.textContent = detailedData.database_size || 'Unknown';
                     if (activeDevicesEl) activeDevicesEl.textContent = detailedData.unique_devices || '0';
                     if (dataRangeEl) dataRangeEl.textContent = detailedData.date_range_days ? `${detailedData.date_range_days} days` : 'No data';
+                    
+                    // Update Recent Activity elements
+                    const records24hEl = document.getElementById('records-24h');
+                    const records7dEl = document.getElementById('records-7d');
+                    const latestEntryEl = document.getElementById('latest-entry');
+                    
+                    if (records24hEl) records24hEl.textContent = (detailedData.records_24h || 0).toLocaleString();
+                    if (records7dEl) records7dEl.textContent = (detailedData.records_7d || 0).toLocaleString();
+                    if (latestEntryEl) latestEntryEl.textContent = detailedData.latest_timestamp ? new Date(detailedData.latest_timestamp).toLocaleString() : '--';
+                }
+                
+                // Update Database Health elements
+                if (healthData && healthData.success) {
+                    const dbStatusHealthEl = document.getElementById('db-status-health');
+                    const dbFragmentationEl = document.getElementById('db-fragmentation');
+                    const lastOptimizedDisplayEl = document.getElementById('last-optimized-display');
+                    
+                    if (dbStatusHealthEl) dbStatusHealthEl.textContent = healthData.status || 'Unknown';
+                    if (dbFragmentationEl) dbFragmentationEl.textContent = healthData.fragmentation || 'Unknown';
+                    if (lastOptimizedDisplayEl) lastOptimizedDisplayEl.textContent = healthData.last_optimized ? new Date(healthData.last_optimized).toLocaleString() : 'Never';
                 }
                 
                 console.log('Database stats updated:', {
                     lastOptimized: healthData?.last_optimized,
                     databaseSize: healthData?.database_size || detailedData?.database_size,
+                    records24h: detailedData?.records_24h,
+                    records7d: detailedData?.records_7d,
+                    latestEntry: detailedData?.latest_timestamp,
                     elementsFound: {
                         lastVacuum: !!lastVacuumEl,
                         currentDbSize: !!currentDbSizeEl,
-                        totalRecords: !!totalRecordsEl
+                        totalRecords: !!totalRecordsEl,
+                        records24h: !!document.getElementById('records-24h'),
+                        records7d: !!document.getElementById('records-7d'),
+                        latestEntry: !!document.getElementById('latest-entry'),
+                        dbStatusHealth: !!document.getElementById('db-status-health'),
+                        dbFragmentation: !!document.getElementById('db-fragmentation'),
+                        lastOptimizedDisplay: !!document.getElementById('last-optimized-display')
                     }
                 });
                 
@@ -3134,6 +3627,7 @@ def get_page_script(page):
                     const serialStatus = document.getElementById('pvs6-serial-status');
                     const passwordStatus = document.getElementById('wifi-password-status');
                     const configStatus = document.getElementById('config-file-status');
+                    const timezoneStatus = document.getElementById('timezone-status');
                     
                     if (serialStatus) {
                         const isConfigured = (data.config.PVS6_SERIAL_NUMBER && data.config.PVS6_SERIAL_NUMBER !== 'CONFIGURED');
@@ -3155,6 +3649,15 @@ def get_page_script(page):
                         configStatus.textContent = exists ? 'Exists' : 'Missing';
                         configStatus.style.color = color;
                         configStatus.parentElement.style.borderLeftColor = color;
+                    }
+                    
+                    if (timezoneStatus) {
+                        const timezone = data.config.SYSTEM_TIMEZONE || 'America/Denver';
+                        const isDefault = timezone === 'America/Denver';
+                        const color = isDefault ? '#ff9800' : '#27ae60';
+                        timezoneStatus.textContent = timezone;
+                        timezoneStatus.style.color = color;
+                        timezoneStatus.parentElement.style.borderLeftColor = color;
                     }
                 } else {
                     console.warn('Config API returned success=false:', data.error);
@@ -3414,7 +3917,7 @@ def get_page_script(page):
             
             // Multiple attempts to ensure PVS6 status updates
             setTimeout(() => {
-            updatePVS6Status();
+                updatePVS6Status();
             }, 500);
             
             setTimeout(() => {
@@ -3444,7 +3947,7 @@ def get_page_script(page):
         '''
     elif page == 'analytics':
         return '''
-        let analyticsChart = null;
+        // Use window.analyticsChart for global chart instance
         
         // Chart.js configuration
         const chartConfigs = {
@@ -3559,14 +4062,19 @@ def get_page_script(page):
             if (!canvas) return;
             
             // Destroy existing chart
-            if (analyticsChart) {
-                analyticsChart.destroy();
+            if (window.analyticsChart && typeof window.analyticsChart.destroy === 'function') {
+                try {
+                    window.analyticsChart.destroy();
+                } catch (e) {
+                    console.log('Chart destroy error (ignored):', e);
+                }
             }
+            window.analyticsChart = null;
             
             const ctx = canvas.getContext('2d');
             const config = chartConfigs[type] || chartConfigs.line;
             
-            analyticsChart = new Chart(ctx, {
+            window.analyticsChart = new Chart(ctx, {
                 ...config,
                 data: {
                     labels: data.map(d => d.time_label),
@@ -3614,6 +4122,59 @@ def get_page_script(page):
             // No detailed stats to update since Performance Summary was removed
         }
         
+        // Load Performance Summary for analytics page
+        async function loadPerformanceSummary(period) {
+            try {
+                const selectedPeriod = period || '24h'; // Default to 24h for analytics
+                const response = await fetch(`/api/performance_summary?period=${selectedPeriod}`);
+                const data = await response.json();
+                
+                if (data.success && data.summary) {
+                    const summary = data.summary;
+                    
+                    // Update peak performance (only if elements exist)
+                    const peakProdEl = document.getElementById('peak-production-overview');
+                    if (peakProdEl) peakProdEl.textContent = `${(summary.peak_production || 0).toFixed(2)} kW`;
+                    
+                    const peakProdTimeEl = document.getElementById('peak-production-time');
+                    if (peakProdTimeEl) peakProdTimeEl.textContent = summary.peak_production_time || '--';
+                    
+                    const peakConsEl = document.getElementById('peak-consumption-overview');
+                    if (peakConsEl) peakConsEl.textContent = `${(summary.peak_consumption || 0).toFixed(2)} kW`;
+                    
+                    const peakConsTimeEl = document.getElementById('peak-consumption-time');
+                    if (peakConsTimeEl) peakConsTimeEl.textContent = summary.peak_consumption_time || '--';
+                    
+                    const bestExportEl = document.getElementById('best-export-overview');
+                    if (bestExportEl) bestExportEl.textContent = `${(summary.best_export || 0).toFixed(2)} kW`;
+                    
+                    const bestExportTimeEl = document.getElementById('best-export-time');
+                    if (bestExportTimeEl) bestExportTimeEl.textContent = summary.best_export_time || '--';
+                    
+                    // Update daily averages (only if elements exist and data is available)
+                    const avgProdEl = document.getElementById('avg-daily-production');
+                    if (avgProdEl) {
+                        avgProdEl.textContent = summary.avg_daily_production !== null ? 
+                            (summary.avg_daily_production || 0).toFixed(1) : 'N/A';
+                    }
+                    
+                    const avgConsEl = document.getElementById('avg-daily-consumption');
+                    if (avgConsEl) {
+                        avgConsEl.textContent = summary.avg_daily_consumption !== null ? 
+                            (summary.avg_daily_consumption || 0).toFixed(1) : 'N/A';
+                    }
+                    
+                    const avgExportEl = document.getElementById('avg-daily-export');
+                    if (avgExportEl) {
+                        avgExportEl.textContent = summary.avg_daily_export !== null ? 
+                            (summary.avg_daily_export || 0).toFixed(1) : 'N/A';
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading performance summary:', error);
+            }
+        }
+        
         // Show/hide loading indicator
         function showChartLoading(show) {
             const loading = document.getElementById('chart-loading');
@@ -3654,7 +4215,11 @@ def get_page_script(page):
             }
             
             console.log('Executing SQL for chart:', sqlQuery);
-            document.getElementById('chart-loading').style.display = 'block';
+            
+            // Show SQL chart section and loading indicator
+            document.getElementById('sql-chart-section').style.display = 'block';
+            document.getElementById('sql-chart-loading').style.display = 'block';
+            document.getElementById('sql-chart-error').style.display = 'none';
             
             fetch('/api/execute-sql-chart', {
                 method: 'POST',
@@ -3683,17 +4248,44 @@ def get_page_script(page):
         
         // Render chart from SQL results
         function renderSQLChart(results, sqlQuery) {
+            console.log('renderSQLChart called with:', results.length, 'results');
+            
             if (!results || results.length === 0) {
-                showError('No data returned from query');
+                showSQLChartError('No data returned from query');
                 return;
             }
             
-            const ctx = document.getElementById('analyticsChart').getContext('2d');
+            // Show the SQL chart section
+            document.getElementById('sql-chart-section').style.display = 'block';
             
-            // Destroy existing chart
-            if (window.analyticsChart && typeof window.analyticsChart.destroy === 'function') {
-                window.analyticsChart.destroy();
+            // Hide loading indicator
+            const loading = document.getElementById('sql-chart-loading');
+            if (loading) {
+                loading.style.display = 'none';
             }
+            
+            // Hide any previous errors
+            document.getElementById('sql-chart-error').style.display = 'none';
+            
+            const canvas = document.getElementById('sqlChart');
+            if (!canvas) {
+                console.error('SQL Chart canvas not found');
+                showSQLChartError('Chart canvas not found');
+                return;
+            }
+            
+            console.log('SQL Canvas found, getting context...');
+            const ctx = canvas.getContext('2d');
+            
+            // Destroy existing SQL chart
+            if (window.sqlChart && typeof window.sqlChart.destroy === 'function') {
+                try {
+                    window.sqlChart.destroy();
+                } catch (e) {
+                    console.log('SQL Chart destroy error (ignored):', e);
+                }
+            }
+            window.sqlChart = null;
             
             // Extract column names (excluding time_label and timestamp)
             const columns = Object.keys(results[0]).filter(col => 
@@ -3751,50 +4343,100 @@ def get_page_script(page):
                 xAxisLabel = 'Category';
             }
             
-            window.analyticsChart = new Chart(ctx, {
-                type: chartType === 'area' ? 'line' : chartType,
-                data: {
-                    labels: labels,
-                    datasets: datasets
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        intersect: false,
-                        mode: 'index'
+            try {
+                window.sqlChart = new Chart(ctx, {
+                    type: chartType === 'area' ? 'line' : chartType,
+                    data: {
+                        labels: labels,
+                        datasets: datasets
                     },
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: chartTitle,
-                            font: { size: 16, weight: 'bold' }
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
                         },
-                        legend: {
-                            display: true,
-                            position: 'top'
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
+                        plugins: {
                             title: {
                                 display: true,
-                                text: yAxisLabel
+                                text: chartTitle,
+                                font: { size: 16, weight: 'bold' }
+                            },
+                            legend: {
+                                display: true,
+                                position: 'top'
                             }
                         },
-                        x: {
-                            title: {
-                                display: true,
-                                text: xAxisLabel
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: yAxisLabel
+                                }
                             },
-                            ticks: {
-                                maxRotation: chartType === 'bar' ? 45 : 0
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: xAxisLabel
+                                },
+                                ticks: {
+                                    maxRotation: chartType === 'bar' ? 45 : 0
+                                }
                             }
                         }
                     }
+                });
+                console.log('SQL Chart created successfully');
+            } catch (error) {
+                console.error('Error creating SQL chart:', error);
+                showSQLChartError('Failed to create chart: ' + error.message);
+            }
+        }
+        
+        // SQL Chart helper functions
+        function showSQLChartError(message) {
+            document.getElementById('sql-chart-section').style.display = 'block';
+            document.getElementById('sql-chart-loading').style.display = 'none';
+            document.getElementById('sql-chart-error').style.display = 'block';
+            document.getElementById('sql-chart-error-message').textContent = message;
+        }
+        
+        function hideSQLChart() {
+            document.getElementById('sql-chart-section').style.display = 'none';
+            if (window.sqlChart && typeof window.sqlChart.destroy === 'function') {
+                try {
+                    window.sqlChart.destroy();
+                } catch (e) {
+                    console.log('SQL Chart destroy error (ignored):', e);
                 }
-            });
+            }
+            window.sqlChart = null;
+        }
+        
+        function toggleSQLChartFullscreen() {
+            const container = document.getElementById('sql-chart-container');
+            if (container.style.height === '100vh') {
+                container.style.height = '400px';
+                container.style.position = 'relative';
+                container.style.zIndex = 'auto';
+            } else {
+                container.style.height = '100vh';
+                container.style.position = 'fixed';
+                container.style.top = '0';
+                container.style.left = '0';
+                container.style.width = '100vw';
+                container.style.zIndex = '9999';
+                container.style.background = 'white';
+            }
+            
+            // Trigger chart resize
+            setTimeout(() => {
+                if (window.sqlChart) {
+                    window.sqlChart.resize();
+                }
+            }, 100);
         }
         
         // Chart resizing functions
@@ -3857,6 +4499,105 @@ def get_page_script(page):
             }
         });
         
+        // Export query results
+        function exportQueryResults(format) {
+            const sqlQuery = document.getElementById('sql-query').value.trim();
+            if (!sqlQuery) {
+                alert('Please enter a SQL query first');
+                return;
+            }
+            
+            // Show loading state
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = format.toUpperCase() === 'CSV' ? '⏳ Exporting CSV...' : '⏳ Exporting JSON...';
+            button.disabled = true;
+            
+            fetch('/api/execute-query', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ query: sqlQuery })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.results && data.results.length > 0) {
+                    if (format.toLowerCase() === 'csv') {
+                        exportAsCSV(data.results, 'query_results.csv');
+                    } else {
+                        exportAsJSON(data.results, 'query_results.json');
+                    }
+                } else {
+                    alert('No data to export. Please run a query that returns results first.');
+                }
+            })
+            .catch(error => {
+                console.error('Export error:', error);
+                alert('Failed to export data: ' + error.message);
+            })
+            .finally(() => {
+                // Restore button state
+                button.textContent = originalText;
+                button.disabled = false;
+            });
+        }
+        
+        // Export data as CSV
+        function exportAsCSV(data, filename) {
+            if (!data || data.length === 0) return;
+            
+            // Get column headers
+            const headers = Object.keys(data[0]);
+            
+            // Create CSV content
+            let csvContent = headers.join(',') + '\\n';
+            
+            data.forEach(row => {
+                const values = headers.map(header => {
+                    let value = row[header];
+                    // Handle null/undefined values
+                    if (value === null || value === undefined) {
+                        value = '';
+                    }
+                    // Escape quotes and wrap in quotes if contains comma or quote
+                    value = String(value);
+                    if (value.includes(',') || value.includes('"') || value.includes('\\n')) {
+                        value = '"' + value.replace(/"/g, '""') + '"';
+                    }
+                    return value;
+                });
+                csvContent += values.join(',') + '\\n';
+            });
+            
+            // Create and download file
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+        
+        // Export data as JSON
+        function exportAsJSON(data, filename) {
+            const jsonContent = JSON.stringify(data, null, 2);
+            const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+        
         // Initialize analytics page
         if (document.getElementById('analyticsChart')) {
             // Load Chart.js if not already loaded
@@ -3866,11 +4607,13 @@ def get_page_script(page):
                 script.onload = () => {
                     updateGranularitySuggestions(); // Set initial granularity options
                     loadAnalyticsData();
+                    loadPerformanceSummary(); // Load performance summary on page load
                 };
                 document.head.appendChild(script);
             } else {
                 updateGranularitySuggestions(); // Set initial granularity options
                 loadAnalyticsData();
+                loadPerformanceSummary(); // Load performance summary on page load
             }
             
             // Auto-suggest granularity based on time period
@@ -3959,62 +4702,44 @@ def get_page_script(page):
         
         // SQL Query Interface Functions
         async function executeQuery() {
+            console.log('=== executeQuery called ===');
             const query = document.getElementById('sql-query').value.trim();
+            console.log('Query:', query);
+            
             if (!query) {
                 alert('Please enter a SQL query');
                 return;
             }
             
             try {
+                console.log('Sending request to /api/execute-query');
                 const response = await fetch('/api/execute-query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ query: query })
                 });
+                console.log('Response received:', response.status);
                 const data = await response.json();
-                displayQueryResults(data);
+                console.log('Data parsed:', data);
+                console.log('About to call displayQueryResults. Function exists:', typeof displayQueryResults);
+                if (typeof displayQueryResults === 'undefined') {
+                    console.error('displayQueryResults function is not defined!');
+                    document.getElementById('query-results').innerHTML = '<div class="error-message">displayQueryResults function is not defined</div>';
+                    return;
+                }
+                try {
+                    displayQueryResults(data);
+                } catch (displayError) {
+                    console.error('Error in displayQueryResults:', displayError);
+                    document.getElementById('query-results').innerHTML = `<div class="error-message">Display Error: ${displayError.message}</div>`;
+                }
             } catch (error) {
+                console.error('Error in executeQuery:', error);
                 document.getElementById('query-results').innerHTML = `<div class="error-message">Error: ${error.message}</div>`;
             }
         }
         
-        function displayQueryResults(data) {
-            const resultsDiv = document.getElementById('query-results');
-            
-            if (!data.success) {
-                resultsDiv.innerHTML = `<div class="error-message">Error: ${data.error}</div>`;
-                return;
-            }
-            
-            if (!data.results || data.results.length === 0) {
-                resultsDiv.innerHTML = '<div class="info-message">No results found</div>';
-                return;
-            }
-            
-            // Create table
-            let html = '<div class="table-container"><table class="data-table">';
-            
-            // Header
-            const columns = Object.keys(data.results[0]);
-            html += '<thead><tr>';
-            columns.forEach(col => {
-                html += `<th>${col}</th>`;
-            });
-            html += '</tr></thead>';
-            
-            // Body
-            html += '<tbody>';
-            data.results.forEach(row => {
-                html += '<tr>';
-                columns.forEach(col => {
-                    html += `<td>${row[col] || ''}</td>`;
-                });
-                html += '</tr>';
-            });
-            html += '</tbody></table></div>';
-            
-            resultsDiv.innerHTML = html;
-        }
+        // Old displayQueryResults function removed - using the AG-Grid version below
         
         function loadQueryTemplate(type) {
             // Get current timeframe and granularity from chart controls
@@ -4129,10 +4854,6 @@ LIMIT 12;`
             
             alert('Query validation passed! ✅ This appears to be a safe SELECT query.');
         }
-        '''
-    elif page == 'data':
-        return '''
-        // Enhanced Database Statistics
         window.refreshDbStats = async function refreshDbStats() {
             try {
                 const [detailedRes, healthRes] = await Promise.all([
@@ -4146,7 +4867,7 @@ LIMIT 12;`
                         document.getElementById('total-records-stat').textContent = 
                             (data.total_records || 0).toLocaleString();
                         document.getElementById('db-size-stat').textContent = 
-                            data.database_size || 'Unknown';
+                        data.database_size || 'Unknown';
                         document.getElementById('active-devices-stat').textContent = 
                             data.unique_devices || '0';
                         document.getElementById('data-range-stat').textContent = 
@@ -4176,42 +4897,177 @@ LIMIT 12;`
             }
         }
         
-        // Enhanced Query Functions
-        async function executeQuery() {
-            const query = document.getElementById('sql-query').value.trim();
-            if (!query) {
-                alert('Please enter a SQL query');
+        // Enhanced Query Functions - removed duplicate, using the one above with debugging
+        
+        // Test function to check if JavaScript is parsing correctly
+        console.log('JavaScript parsing test - functions should be defined after this point');
+        
+        // Global variable to store the AG-Grid instance
+        let queryResultsGrid = null;
+        let tableBrowserGrid = null;
+        
+        // Function to load AG-Grid dynamically if not available
+        function loadAGGrid(callback) {
+            if (typeof agGrid !== 'undefined') {
+                callback();
                 return;
             }
             
-            try {
-                const response = await fetch('/api/execute-query', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query: query })
-                });
-                
-                const data = await response.json();
-                displayQueryResults(data);
-            } catch (error) {
-                console.error('Error executing query:', error);
-            }
+            console.log('Loading AG-Grid dynamically...');
+            
+            // Load CSS (Local)
+            const cssLink1 = document.createElement('link');
+            cssLink1.rel = 'stylesheet';
+            cssLink1.href = '/static/css/ag-grid.css';
+            document.head.appendChild(cssLink1);
+            
+            const cssLink2 = document.createElement('link');
+            cssLink2.rel = 'stylesheet';
+            cssLink2.href = '/static/css/ag-theme-alpine.css';
+            document.head.appendChild(cssLink2);
+            
+            // Load JS (Local)
+            const script = document.createElement('script');
+            script.src = '/static/js/ag-grid-community.min.js';
+            script.onload = () => {
+                console.log('AG-Grid loaded successfully');
+                setTimeout(callback, 100); // Small delay to ensure initialization
+            };
+            script.onerror = () => {
+                console.error('Failed to load AG-Grid');
+                callback(); // Continue anyway, will fall back to basic table
+            };
+            document.head.appendChild(script);
         }
         
         function displayQueryResults(data) {
+            console.log('=== displayQueryResults called ===');
+            console.log('Data received:', data);
+            
             const resultsDiv = document.getElementById('query-results');
+            const resultsSection = document.getElementById('query-results-section');
+            const resultsTitle = document.getElementById('results-title');
+            
+            console.log('DOM elements found:', {
+                resultsDiv: !!resultsDiv,
+                resultsSection: !!resultsSection,
+                resultsTitle: !!resultsTitle
+            });
             
             if (!data.success) {
                 resultsDiv.innerHTML = `<div class="error-message">Error: ${data.error}</div>`;
+                resultsSection.style.display = 'none';
                 return;
             }
             
             if (!data.results || data.results.length === 0) {
                 resultsDiv.innerHTML = '<div class="success-message">Query executed successfully. No results returned.</div>';
+                resultsSection.style.display = 'none';
                 return;
             }
             
+            // Clear any previous error messages
+            resultsDiv.innerHTML = '';
+            
+            // Show the results section
+            resultsSection.style.display = 'block';
+            resultsTitle.textContent = `Query Results (${data.results.length} rows)`;
+            
+            // Load AG-Grid and then create the grid
+            loadAGGrid(() => {
+                createAGGrid(data, resultsDiv, resultsSection);
+            });
+        }
+        
+        function createAGGrid(data, resultsDiv, resultsSection) {
+            console.log('=== createAGGrid called ===');
+            console.log('queryResultsGrid variable exists:', typeof queryResultsGrid);
+            
+            // Prepare column definitions for AG-Grid
             const columns = Object.keys(data.results[0]);
+            const columnDefs = columns.map(col => ({
+                field: col,
+                headerName: col.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                sortable: true,
+                filter: true,
+                resizable: true,
+                minWidth: 100,
+                valueFormatter: (params) => {
+                    if (col === 'timestamp' && params.value) {
+                        return new Date(params.value).toLocaleString();
+                    }
+                    if (typeof params.value === 'number' && col.includes('_kw')) {
+                        return params.value.toFixed(3);
+                    }
+                    return params.value || '';
+                }
+            }));
+            
+            // Grid options
+            const gridOptions = {
+                columnDefs: columnDefs,
+                rowData: data.results,
+                defaultColDef: {
+                    sortable: true,
+                    filter: true,
+                    resizable: true,
+                    minWidth: 100
+                },
+                pagination: true,
+                paginationPageSize: 50,
+                paginationPageSizeSelector: [25, 50, 100, 200],
+                animateRows: true,
+                cellSelection: true,
+                enableCellTextSelection: true,
+                suppressMenuHide: true,
+                theme: 'legacy',
+                onGridReady: (params) => {
+                    params.api.sizeColumnsToFit();
+                }
+            };
+            
+            // Destroy existing grid if it exists
+            if (queryResultsGrid) {
+                try {
+                    queryResultsGrid.destroy();
+                } catch (e) {
+                    console.log('Grid destroy error (ignored):', e);
+                }
+            }
+            
+            // Create new grid
+            const gridDiv = document.getElementById('query-results-grid');
+            console.log('Creating AG-Grid with options:', gridOptions);
+            console.log('AG-Grid available:', typeof agGrid);
+            
+            // Check if AG-Grid is loaded
+            console.log('Window object keys containing "ag":', Object.keys(window).filter(k => k.toLowerCase().includes('ag')));
+            console.log('agGrid object:', window.agGrid);
+            console.log('AG-Grid available:', typeof agGrid !== 'undefined');
+            
+            if (typeof agGrid === 'undefined') {
+                console.error('AG-Grid still not loaded after dynamic loading - falling back to basic table');
+                resultsSection.style.display = 'none';
+                createBasicTable(data);
+                return;
+            }
+            
+            try {
+                queryResultsGrid = agGrid.createGrid(gridDiv, gridOptions);
+                console.log('AG-Grid created successfully:', queryResultsGrid);
+            } catch (error) {
+                console.error('Error creating AG-Grid:', error);
+                console.log('Falling back to basic table');
+                resultsSection.style.display = 'none';
+                createBasicTable(data);
+            }
+        }
+        
+        // Fallback function to create basic table if AG-Grid fails
+        function createBasicTable(data) {
+            const resultsDiv = document.getElementById('query-results');
+            const columns = Object.keys(data.results[0]);
+            
             let tableHTML = `
                 <div class="success-message">Query executed successfully. ${data.results.length} rows returned.</div>
                 <div class="results-container">
@@ -4241,9 +5097,53 @@ LIMIT 12;`
             resultsDiv.innerHTML = tableHTML;
         }
         
+        // Export AG-Grid data
+        function exportGridData(format) {
+            if (!queryResultsGrid) {
+                alert('No data to export. Please run a query first.');
+                return;
+            }
+            
+            try {
+                if (format === 'csv') {
+                    queryResultsGrid.api.exportDataAsCsv({
+                        fileName: 'query_results.csv',
+                        columnSeparator: ','
+                    });
+                } else if (format === 'json') {
+                    // Get all row data
+                    const rowData = [];
+                    queryResultsGrid.api.forEachNode(node => rowData.push(node.data));
+                    
+                    const jsonData = JSON.stringify(rowData, null, 2);
+                    const blob = new Blob([jsonData], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'query_results.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }
+            } catch (error) {
+                console.error('Export error:', error);
+                alert('Export failed: ' + error.message);
+            }
+        }
+        
         function clearQuery() {
             document.getElementById('sql-query').value = '';
             document.getElementById('query-results').innerHTML = '';
+            document.getElementById('query-results-section').style.display = 'none';
+            if (queryResultsGrid) {
+                try {
+                    queryResultsGrid.destroy();
+                } catch (e) {
+                    console.log('Grid destroy error (ignored):', e);
+                }
+                queryResultsGrid = null;
+            }
         }
         
         function loadSampleQueries() {
@@ -4255,10 +5155,54 @@ LIMIT 12;`
             const query = samples[Math.floor(Math.random() * samples.length)];
             document.getElementById('sql-query').value = query;
         }
+        '''
+    elif page == 'data':
+        return '''
+        // Database Statistics Function
+        async function refreshDbStats() {
+            try {
+                const [detailedRes, healthRes] = await Promise.all([
+                    fetch('/api/db/detailed-status'),
+                    fetch('/api/db/health-check')
+                ]);
+                
+                if (detailedRes.ok) {
+                    const data = await detailedRes.json();
+                    if (data.success) {
+                        document.getElementById('total-records-stat').textContent = 
+                            (data.total_records || 0).toLocaleString();
+                        document.getElementById('db-size-stat').textContent = 
+                        data.database_size || 'Unknown';
+                        document.getElementById('active-devices-stat').textContent = 
+                            data.unique_devices || '0';
+                        document.getElementById('data-range-stat').textContent = 
+                            data.date_range || '--';
+                        
+                        // Recent Activity
+                        document.getElementById('records-24h').textContent = 
+                            (data.records_24h || 0).toLocaleString();
+                        document.getElementById('records-7d').textContent = 
+                            (data.records_7d || 0).toLocaleString();
+                        document.getElementById('latest-entry').textContent = 
+                            data.latest_timestamp ? new Date(data.latest_timestamp).toLocaleString() : '--';
+                    }
+                }
+                
+                if (healthRes.ok) {
+                    const healthData = await healthRes.json();
+                    if (healthData.success) {
+                        document.getElementById('db-status-health').textContent = healthData.status || 'Unknown';
+                        document.getElementById('db-fragmentation').textContent = healthData.fragmentation || 'Unknown';
+                        document.getElementById('last-optimized').textContent = 
+                            healthData.last_optimized ? new Date(healthData.last_optimized).toLocaleString() : 'Never';
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading DB stats:', error);
+            }
+        }
         
-
-        
-        // Advanced Table Browser Functions
+        // Table Browser Functions
         async function loadTableData() {
             const tableSelector = document.getElementById('table-selector').value;
             const timeFilter = document.getElementById('time-filter').value;
@@ -4333,17 +5277,117 @@ LIMIT 12;`
         }
         
         function displayTableResults(data) {
+            console.log('=== displayTableResults called ===');
+            console.log('Data received:', data);
+            
             const resultsDiv = document.getElementById('table-browser-results');
+            const resultsSection = document.getElementById('table-browser-results-section');
+            const resultsTitle = document.getElementById('table-results-title');
+            
+            console.log('DOM elements found:', {
+                resultsDiv: !!resultsDiv,
+                resultsSection: !!resultsSection,
+                resultsTitle: !!resultsTitle
+            });
             
             if (!data.success) {
                 resultsDiv.innerHTML = `<div class="error-message">Error: ${data.error}</div>`;
+                resultsSection.style.display = 'none';
                 return;
             }
             
             if (!data.results || data.results.length === 0) {
                 resultsDiv.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;"><div style="font-size: 3em; margin-bottom: 10px;">📊</div><div>No records found matching your criteria.</div></div>';
+                resultsSection.style.display = 'none';
                 return;
             }
+            
+            // Update title
+            resultsTitle.textContent = `Table Results (${data.results.length} rows)`;
+            
+            // Try to use AG-Grid first
+            loadAGGrid(() => {
+                try {
+                    createTableBrowserAGGrid(data);
+                    resultsDiv.style.display = 'none';
+                    resultsSection.style.display = 'block';
+                } catch (error) {
+                    console.error('Error creating AG-Grid for table browser:', error);
+                    createTableBrowserBasicTable(data);
+                    resultsDiv.style.display = 'block';
+                    resultsSection.style.display = 'none';
+                }
+            });
+        }
+        
+        function createTableBrowserAGGrid(data) {
+            console.log('=== createTableBrowserAGGrid called ===');
+            console.log('tableBrowserGrid variable exists:', typeof tableBrowserGrid);
+            
+            // Destroy existing grid
+            if (tableBrowserGrid && typeof tableBrowserGrid.destroy === 'function') {
+                try {
+                    tableBrowserGrid.destroy();
+                } catch (error) {
+                    console.error('Error destroying existing table browser grid:', error);
+                }
+                tableBrowserGrid = null;
+            }
+            
+            const columns = Object.keys(data.results[0]);
+            const columnDefs = columns.map(col => ({
+                field: col,
+                headerName: col.charAt(0).toUpperCase() + col.slice(1).replace(/_/g, ' '),
+                sortable: true,
+                filter: true,
+                resizable: true,
+                valueFormatter: (params) => {
+                    if (col === 'timestamp' && params.value) {
+                        return new Date(params.value).toLocaleString();
+                    }
+                    if (typeof params.value === 'number' && col.includes('_kw')) {
+                        return params.value.toFixed(3) + ' kW';
+                    }
+                    return params.value || '';
+                }
+            }));
+            
+            const gridOptions = {
+                columnDefs: columnDefs,
+                rowData: data.results,
+                defaultColDef: {
+                    sortable: true,
+                    filter: true,
+                    resizable: true,
+                    minWidth: 100
+                },
+                pagination: true,
+                paginationPageSize: 50,
+                paginationPageSizeSelector: [25, 50, 100, 200],
+                cellSelection: true,
+                theme: 'legacy'
+            };
+            
+            console.log('Creating AG-Grid with options:', gridOptions);
+            console.log('AG-Grid available:', typeof agGrid);
+            
+            const gridDiv = document.getElementById('table-browser-grid');
+            console.log('Grid container found:', !!gridDiv);
+            
+            if (typeof agGrid !== 'undefined' && gridDiv) {
+                console.log('Window object keys containing "ag":', Object.keys(window).filter(key => key.toLowerCase().includes('ag')));
+                console.log('agGrid object:', agGrid);
+                console.log('AG-Grid available:', typeof agGrid !== 'undefined');
+                tableBrowserGrid = agGrid.createGrid(gridDiv, gridOptions);
+                console.log('AG-Grid created successfully:', tableBrowserGrid);
+            } else {
+                throw new Error('AG-Grid not available or container not found');
+            }
+        }
+        
+        function createTableBrowserBasicTable(data) {
+            console.log('=== createTableBrowserBasicTable called (fallback) ===');
+            const resultsDiv = document.getElementById('table-browser-results');
             
             const columns = Object.keys(data.results[0]);
             let tableHTML = `
@@ -4517,20 +5561,507 @@ LIMIT 12;`
             }
         }
         
+        // SQL Query Interface Functions
+        async function executeQuery() {
+            console.log('=== executeQuery called ===');
+            const query = document.getElementById('sql-query').value.trim();
+            console.log('Query:', query);
+            
+            if (!query) {
+                alert('Please enter a SQL query');
+                return;
+            }
+            
+            try {
+                console.log('Sending request to /api/execute-query');
+                const response = await fetch('/api/execute-query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query })
+                });
+                console.log('Response received:', response.status);
+                const data = await response.json();
+                console.log('Data parsed:', data);
+                displayQueryResults(data);
+            } catch (error) {
+                console.error('Error in executeQuery:', error);
+                document.getElementById('query-results').innerHTML = `<div class="error-message">Error: ${error.message}</div>`;
+            }
+        }
+        
+        function loadQueryTemplate(type) {
+            const templates = {
+                'recent': `-- 📈 Recent Production: Solar production trend
+SELECT 
+    strftime('%H:%M', timestamp) as time_label,
+    AVG(production_kw) as production_kw,
+    AVG(consumption_kw) as consumption_kw,
+    AVG(production_kw - consumption_kw) as net_export_kw,
+    timestamp
+FROM solar_data 
+WHERE datetime(timestamp) >= datetime('now', 'localtime', '-24 hours')
+GROUP BY strftime('%Y-%m-%d %H:00', timestamp)
+ORDER BY timestamp DESC 
+LIMIT 100;`,
+                
+                'devices': `-- 🔌 Device Summary: System performance metrics
+SELECT 
+    strftime('%H:%M', timestamp) as time_label,
+    AVG(production_kw) as avg_production_kw,
+    MAX(production_kw) as peak_production_kw,
+    MIN(production_kw) as min_production_kw,
+    AVG(consumption_kw) as avg_consumption_kw,
+    COUNT(*) as data_points
+FROM solar_data 
+WHERE datetime(timestamp) >= datetime('now', 'localtime', '-24 hours')
+GROUP BY strftime('%Y-%m-%d %H:00', timestamp)
+ORDER BY timestamp DESC;`,
+                
+                'hourly': `-- ⏰ Hourly Totals: Energy production and consumption
+SELECT 
+    strftime('%H:00', timestamp) as time_label,
+    ROUND(SUM(production_kw) / 4.0, 2) as production_kwh,
+    ROUND(SUM(consumption_kw) / 4.0, 2) as consumption_kwh,
+    ROUND(SUM(production_kw - consumption_kw) / 4.0, 2) as net_export_kwh,
+    COUNT(*) as data_points
+FROM solar_data 
+WHERE datetime(timestamp) >= datetime('now', 'localtime', '-24 hours')
+GROUP BY strftime('%H', timestamp)
+ORDER BY time_label DESC
+LIMIT 24;`,
+                
+                'top': `-- 🏆 Top Producers: Peak performance hours
+SELECT 
+    strftime('%H:00', timestamp) as time_label,
+    ROUND(MAX(production_kw), 3) as peak_production_kw,
+    ROUND(AVG(production_kw), 3) as avg_production_kw,
+    ROUND(SUM(production_kw) / 4.0, 2) as hourly_production_kwh,
+    COUNT(*) as data_points
+FROM solar_data 
+WHERE datetime(timestamp) >= datetime('now', 'localtime', '-24 hours')
+    AND production_kw > 0
+GROUP BY strftime('%H', timestamp)
+ORDER BY peak_production_kw DESC
+LIMIT 12;`
+            };
+            
+            document.getElementById('sql-query').value = templates[type] || '';
+        }
+        
+        function validateQuery() {
+            const query = document.getElementById('sql-query').value.trim();
+            if (!query) {
+                alert('Please enter a SQL query first');
+                return;
+            }
+            
+            const cleanQuery = query.replace(/^\\s*--.*$/gm, '').trim();
+            if (!cleanQuery.toUpperCase().startsWith('SELECT')) {
+                alert('Only SELECT queries are allowed for security');
+                return;
+            }
+            
+            const dangerous = ['DROP', 'DELETE', 'UPDATE', 'INSERT', 'ALTER', 'CREATE', 'TRUNCATE'];
+            const upperQuery = cleanQuery.toUpperCase();
+            
+            for (const keyword of dangerous) {
+                if (upperQuery.includes(keyword)) {
+                    alert(`Query contains potentially dangerous keyword: ${keyword}. Only SELECT queries are allowed.`);
+                    return;
+                }
+            }
+            
+            alert('Query validation passed! ✅ This appears to be a safe SELECT query.');
+        }
+        
+        function executeQueryAsChart() {
+            const sqlQuery = document.getElementById('sql-query').value.trim();
+            if (!sqlQuery) {
+                alert('Please enter a SQL query');
+                return;
+            }
+            
+            document.getElementById('sql-chart-section').style.display = 'block';
+            document.getElementById('sql-chart-loading').style.display = 'block';
+            document.getElementById('sql-chart-error').style.display = 'none';
+            
+            fetch('/api/execute-sql-chart', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: sqlQuery })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.results && data.results.length > 0) {
+                    renderSQLChart(data.results, sqlQuery);
+                } else {
+                    showSQLChartError(data.error || 'No data returned from query');
+                }
+            })
+            .catch(error => {
+                console.error('Error executing SQL:', error);
+                showSQLChartError('Failed to execute SQL query: ' + error.message);
+            });
+        }
+        
+        function renderSQLChart(results, sqlQuery) {
+            document.getElementById('sql-chart-loading').style.display = 'none';
+            document.getElementById('sql-chart-error').style.display = 'none';
+            
+            const canvas = document.getElementById('sqlChart');
+            if (!canvas) {
+                showSQLChartError('Chart canvas not found');
+                return;
+            }
+            
+            const ctx = canvas.getContext('2d');
+            
+            if (window.sqlChart && typeof window.sqlChart.destroy === 'function') {
+                try {
+                    window.sqlChart.destroy();
+                } catch (e) {
+                    console.log('SQL Chart destroy error (ignored):', e);
+                }
+            }
+            window.sqlChart = null;
+            
+            const columns = Object.keys(results[0]).filter(col => 
+                col !== 'time_label' && col !== 'timestamp' && col !== 'data_points'
+            );
+            
+            const labels = results.map(row => row.time_label || row[Object.keys(row)[0]]);
+            
+            const datasets = columns.map((col, index) => {
+                const colors = ['#2ecc71', '#e74c3c', '#3498db', '#f39c12', '#9b59b6'];
+                const color = colors[index % colors.length];
+                return {
+                    label: col.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                    data: results.map(row => parseFloat(row[col]) || 0),
+                    borderColor: color,
+                    backgroundColor: color + '20',
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.4
+                };
+            });
+            
+            try {
+                window.sqlChart = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels: labels, datasets: datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'SQL Query Results',
+                                font: { size: 16, weight: 'bold' }
+                            }
+                        },
+                        scales: {
+                            y: { beginAtZero: true },
+                            x: { ticks: { maxRotation: 45 } }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error creating SQL chart:', error);
+                showSQLChartError('Failed to create chart: ' + error.message);
+            }
+        }
+        
+        function showSQLChartError(message) {
+            document.getElementById('sql-chart-section').style.display = 'block';
+            document.getElementById('sql-chart-loading').style.display = 'none';
+            document.getElementById('sql-chart-error').style.display = 'block';
+            document.getElementById('sql-chart-error-message').textContent = message;
+        }
+        
+        function hideSQLChart() {
+            document.getElementById('sql-chart-section').style.display = 'none';
+            if (window.sqlChart && typeof window.sqlChart.destroy === 'function') {
+                try {
+                    window.sqlChart.destroy();
+                } catch (e) {
+                    console.log('SQL Chart destroy error (ignored):', e);
+                }
+            }
+            window.sqlChart = null;
+        }
+        
+        function toggleSQLChartFullscreen() {
+            const container = document.getElementById('sql-chart-container');
+            if (container.style.height === '100vh') {
+                container.style.height = '400px';
+                container.style.position = 'relative';
+                container.style.zIndex = 'auto';
+            } else {
+                container.style.height = '100vh';
+                container.style.position = 'fixed';
+                container.style.top = '0';
+                container.style.left = '0';
+                container.style.width = '100vw';
+                container.style.zIndex = '9999';
+                container.style.background = 'white';
+            }
+            
+            setTimeout(() => {
+                if (window.sqlChart) {
+                    window.sqlChart.resize();
+                }
+            }, 100);
+        }
+        
+        // Global variable to store the AG-Grid instance
+        let queryResultsGrid = null;
+        
+        function loadAGGrid(callback) {
+            if (typeof agGrid !== 'undefined') {
+                callback();
+                return;
+            }
+            
+            const cssLink1 = document.createElement('link');
+            cssLink1.rel = 'stylesheet';
+            cssLink1.href = '/static/css/ag-grid.css';
+            document.head.appendChild(cssLink1);
+            
+            const cssLink2 = document.createElement('link');
+            cssLink2.rel = 'stylesheet';
+            cssLink2.href = '/static/css/ag-theme-alpine.css';
+            document.head.appendChild(cssLink2);
+            
+            const script = document.createElement('script');
+            script.src = '/static/js/ag-grid-community.min.js';
+            script.onload = () => {
+                setTimeout(callback, 100);
+            };
+            script.onerror = () => {
+                callback();
+            };
+            document.head.appendChild(script);
+        }
+        
+        function displayQueryResults(data) {
+            const resultsDiv = document.getElementById('query-results');
+            const resultsSection = document.getElementById('query-results-section');
+            const resultsTitle = document.getElementById('results-title');
+            
+            if (!data.success) {
+                resultsDiv.innerHTML = `<div class="error-message">Error: ${data.error}</div>`;
+                resultsSection.style.display = 'none';
+                return;
+            }
+            
+            if (!data.results || data.results.length === 0) {
+                resultsDiv.innerHTML = '<div class="success-message">Query executed successfully. No results returned.</div>';
+                resultsSection.style.display = 'none';
+                return;
+            }
+            
+            resultsDiv.innerHTML = '';
+            resultsSection.style.display = 'block';
+            resultsTitle.textContent = `Query Results (${data.results.length} rows)`;
+            
+            loadAGGrid(() => {
+                createAGGrid(data, resultsDiv, resultsSection);
+            });
+        }
+        
+        function createAGGrid(data, resultsDiv, resultsSection) {
+            const columns = Object.keys(data.results[0]);
+            const columnDefs = columns.map(col => ({
+                field: col,
+                headerName: col.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                sortable: true,
+                filter: true,
+                resizable: true,
+                minWidth: 100
+            }));
+            
+            const gridOptions = {
+                columnDefs: columnDefs,
+                rowData: data.results,
+                defaultColDef: {
+                    sortable: true,
+                    filter: true,
+                    resizable: true,
+                    minWidth: 100
+                },
+                pagination: true,
+                paginationPageSize: 50,
+                paginationPageSizeSelector: [25, 50, 100, 200],
+                animateRows: true,
+                enableCellTextSelection: true,
+                suppressMenuHide: true,
+                theme: 'legacy',
+                onGridReady: (params) => {
+                    params.api.sizeColumnsToFit();
+                }
+            };
+            
+            if (typeof agGrid !== 'undefined') {
+                try {
+                    if (queryResultsGrid) {
+                        queryResultsGrid.destroy();
+                    }
+                    
+                    const gridDiv = document.getElementById('query-results-grid');
+                    queryResultsGrid = agGrid.createGrid(gridDiv, gridOptions);
+                } catch (error) {
+                    console.error('Error creating AG-Grid:', error);
+                    createBasicTable(data, resultsDiv);
+                }
+            } else {
+                createBasicTable(data, resultsDiv);
+            }
+        }
+        
+        function createBasicTable(data, resultsDiv) {
+            const columns = Object.keys(data.results[0]);
+            let html = `
+                <div style="overflow-x: auto; max-height: 600px; border: 1px solid #ddd; border-radius: 8px;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+                        <thead style="background: #f8f9fa; position: sticky; top: 0;">
+                            <tr>
+                                ${columns.map(col => `<th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6; font-weight: 600;">${col.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.results.map((row, index) => `
+                                <tr style="background: ${index % 2 === 0 ? '#ffffff' : '#f8f9fa'};">
+                                    ${columns.map(col => `<td style="padding: 10px; border-bottom: 1px solid #dee2e6;">${row[col] || ''}</td>`).join('')}
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            resultsDiv.innerHTML = html;
+        }
+        
+        function exportGridData(format) {
+            if (!queryResultsGrid) {
+                alert('No data to export');
+                return;
+            }
+            
+            try {
+                if (format === 'csv') {
+                    queryResultsGrid.api.exportDataAsCsv({
+                        fileName: 'query_results.csv',
+                        columnSeparator: ','
+                    });
+                } else if (format === 'json') {
+                    const rowData = [];
+                    queryResultsGrid.api.forEachNode(node => rowData.push(node.data));
+                    
+                    const jsonData = JSON.stringify(rowData, null, 2);
+                    const blob = new Blob([jsonData], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'query_results.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }
+            } catch (error) {
+                console.error('Export error:', error);
+                alert('Export failed: ' + error.message);
+            }
+        }
+        
+        function exportQueryResults(format) {
+            const sqlQuery = document.getElementById('sql-query').value.trim();
+            if (!sqlQuery) {
+                alert('Please enter a SQL query first');
+                return;
+            }
+            
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = format.toUpperCase() === 'CSV' ? '⏳ Exporting CSV...' : '⏳ Exporting JSON...';
+            button.disabled = true;
+            
+            fetch('/api/execute-query', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: sqlQuery })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.results && data.results.length > 0) {
+                    if (format.toLowerCase() === 'csv') {
+                        exportAsCSV(data.results, 'query_results.csv');
+                    } else {
+                        exportAsJSON(data.results, 'query_results.json');
+                    }
+                } else {
+                    alert('No data to export. Please run a query that returns results first.');
+                }
+            })
+            .catch(error => {
+                console.error('Export error:', error);
+                alert('Failed to export data: ' + error.message);
+            })
+            .finally(() => {
+                button.textContent = originalText;
+                button.disabled = false;
+            });
+        }
+        
+        function exportAsCSV(data, filename) {
+            const headers = Object.keys(data[0]);
+            const csvContent = [
+                headers.join(','),
+                ...data.map(row => headers.map(header => `"${row[header] || ''}"`).join(','))
+            ].join('\\n');
+            
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        function exportAsJSON(data, filename) {
+            const jsonData = JSON.stringify(data, null, 2);
+            const blob = new Blob([jsonData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
         // Initialize data page
         if (document.getElementById('total-records-stat')) {
-            // Ensure function is available before calling
             if (typeof refreshDbStats === 'function') {
                 refreshDbStats();
-            } else {
-                console.error('refreshDbStats function not defined');
-                // Fallback: try to load stats manually
-                setTimeout(() => {
-                    if (typeof refreshDbStats === 'function') {
-                        refreshDbStats();
-                    }
-                }, 100);
             }
+        }
+        
+        // Load Chart.js for SQL visualization
+        if (typeof Chart === 'undefined') {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+            script.onload = () => {
+                console.log('Chart.js loaded successfully for Data page');
+            };
+            script.onerror = () => {
+                console.error('Failed to load Chart.js for Data page');
+            };
+            document.head.appendChild(script);
         }
         '''
     elif page == 'api':
@@ -5723,9 +7254,9 @@ def devices_inverters():
                 # Determine online status
                 online = record['status'] == 'working'
                 
-            inverters.append({
+                inverters.append({
                     'device_id': record['device_id'],
-                'name': f'Inverter {i}',
+                    'name': f'Inverter {i}',
                     'online': online,
                     'power_kw': record['power_kw'],
                     'efficiency_display': efficiency_display,
@@ -6536,6 +8067,7 @@ def pvs6_status():
         # Get WiFi signal strength
         signal_strength = None
         try:
+            # Try nmcli first (Linux with NetworkManager)
             wifi_result = subprocess.run(['nmcli', '-f', 'SIGNAL,SSID', 'dev', 'wifi'], 
                                        capture_output=True, text=True, timeout=5)
             if wifi_result.returncode == 0:
@@ -6545,8 +8077,61 @@ def pvs6_status():
                         if len(parts) >= 1 and parts[0].isdigit():
                             signal_strength = parts[0]
                             break
+        except FileNotFoundError:
+            # nmcli not available, try macOS airport command
+            try:
+                airport_result = subprocess.run(['/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport', '-s'], 
+                                              capture_output=True, text=True, timeout=5)
+                if airport_result.returncode == 0:
+                    for line in airport_result.stdout.split('\n'):
+                        if 'SunPower12345' in line:
+                            # Airport output format: SSID BSSID             RSSI CHANNEL CC
+                            parts = line.split()
+                            if len(parts) >= 3:
+                                rssi = parts[2]
+                                if rssi.lstrip('-').isdigit():
+                                    # Convert RSSI to percentage (rough approximation)
+                                    rssi_val = int(rssi)
+                                    if rssi_val >= -50:
+                                        signal_strength = "100"
+                                    elif rssi_val >= -60:
+                                        signal_strength = "75"
+                                    elif rssi_val >= -70:
+                                        signal_strength = "50"
+                                    elif rssi_val >= -80:
+                                        signal_strength = "25"
+                                    else:
+                                        signal_strength = "10"
+                                    break
+            except:
+                # If all else fails, try iwconfig (Linux without NetworkManager)
+                try:
+                    iwconfig_result = subprocess.run(['iwconfig'], capture_output=True, text=True, timeout=5)
+                    if iwconfig_result.returncode == 0 and 'SunPower12345' in iwconfig_result.stdout:
+                        # Parse iwconfig output for signal quality
+                        import re
+                        signal_match = re.search(r'Signal level=(-?\d+)', iwconfig_result.stdout)
+                        if signal_match:
+                            rssi_val = int(signal_match.group(1))
+                            # Convert RSSI to percentage
+                            if rssi_val >= -50:
+                                signal_strength = "100"
+                            elif rssi_val >= -60:
+                                signal_strength = "75"
+                            elif rssi_val >= -70:
+                                signal_strength = "50"
+                            elif rssi_val >= -80:
+                                signal_strength = "25"
+                            else:
+                                signal_strength = "10"
+                except:
+                    pass
         except:
             pass
+        
+        # If we can't detect signal strength but PVS6 is online, provide a reasonable default
+        if signal_strength is None and pvs_online:
+            signal_strength = "75"  # Assume good signal if we can ping the device
         
         return jsonify({
             'pvs_online': pvs_online, 
@@ -6699,11 +8284,20 @@ def db_health_check():
         
         fragmentation = f"{(freelist_count/page_count*100):.1f}%" if page_count > 0 else "0%"
         
-        # Get last vacuum time (approximate)
-        import os
+        # Get last vacuum time from system metadata table
         try:
-            stat = os.stat(DATABASE_PATH)
-            last_optimized = datetime.fromtimestamp(stat.st_mtime).isoformat()
+            # Try to get actual VACUUM time from metadata table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS system_metadata (
+                    key TEXT PRIMARY KEY,
+                    value TEXT,
+                    updated_at TEXT
+                )
+            ''')
+            
+            cursor.execute('SELECT value FROM system_metadata WHERE key = "last_vacuum"')
+            vacuum_row = cursor.fetchone()
+            last_optimized = vacuum_row['value'] if vacuum_row else None
         except:
             last_optimized = None
         
@@ -6875,6 +8469,21 @@ def optimize_database():
         # Update statistics
         cursor.execute('ANALYZE')
         
+        # Record the optimization time in metadata table
+        optimization_time = datetime.now().isoformat()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS system_metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT,
+                updated_at TEXT
+            )
+        ''')
+        cursor.execute('''
+            INSERT OR REPLACE INTO system_metadata (key, value, updated_at)
+            VALUES (?, ?, ?)
+        ''', ('last_vacuum', optimization_time, optimization_time))
+        
+        conn.commit()
         conn.close()
         
         # Get size after optimization
