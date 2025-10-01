@@ -16,6 +16,8 @@ import os
 import time
 import sqlite3
 from datetime import datetime
+import requests
+import json
 
 # Add the current directory to Python path to import modules
 sys.path.append('/opt/solar_monitor')
@@ -82,9 +84,35 @@ def ensure_tables():
         )
     """)
     
+    # Create weather_data table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS weather_data (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            temperature REAL,
+            feels_like REAL,
+            humidity INTEGER,
+            pressure INTEGER,
+            visibility INTEGER,
+            uv_index REAL,
+            clouds INTEGER,
+            wind_speed REAL,
+            wind_direction INTEGER,
+            weather_main TEXT,
+            weather_description TEXT,
+            weather_icon TEXT,
+            sunrise INTEGER,
+            sunset INTEGER,
+            city TEXT,
+            country TEXT,
+            api_response TEXT
+        )
+    """)
+    
     # Create indexes for better performance
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON solar_data(timestamp)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_device_timestamp ON device_data(device_id, timestamp)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_weather_timestamp ON weather_data(timestamp)")
     
     conn.commit()
     conn.close()
@@ -198,6 +226,94 @@ def collect_and_store_device_data():
     except Exception as e:
         print(f"❌ Error collecting individual device data: {e}")
 
+def collect_weather_data():
+    """Collect and store weather data"""
+    try:
+        # Get weather configuration from environment
+        weather_enabled = os.getenv('WEATHER_ENABLED', 'true').lower() == 'true'
+        weather_api_key = os.getenv('WEATHER_API_KEY', '')
+        weather_lat = os.getenv('WEATHER_LATITUDE', '39.7392')
+        weather_lon = os.getenv('WEATHER_LONGITUDE', '-104.9903')
+        
+        if not weather_enabled or not weather_api_key:
+            print("⚠️  Weather collection disabled or API key not configured")
+            return
+        
+        # Call OpenWeatherMap API
+        url = f"https://api.openweathermap.org/data/2.5/weather?lat={weather_lat}&lon={weather_lon}&appid={weather_api_key}&units=metric"
+        
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            weather_data = response.json()
+            
+            # Extract weather information
+            weather_info = {
+                'temperature': weather_data['main']['temp'],
+                'feels_like': weather_data['main']['feels_like'],
+                'humidity': weather_data['main']['humidity'],
+                'pressure': weather_data['main']['pressure'],
+                'visibility': weather_data.get('visibility', 0) / 1000,  # Convert to km
+                'uv_index': weather_data.get('uvi', 0),
+                'clouds': weather_data['clouds']['all'],
+                'wind_speed': weather_data['wind']['speed'],
+                'wind_direction': weather_data['wind'].get('deg', 0),
+                'weather_main': weather_data['weather'][0]['main'],
+                'weather_description': weather_data['weather'][0]['description'],
+                'weather_icon': weather_data['weather'][0]['icon'],
+                'sunrise': weather_data['sys']['sunrise'],
+                'sunset': weather_data['sys']['sunset'],
+                'city': weather_data['name'],
+                'country': weather_data['sys']['country']
+            }
+            
+            # Store in database
+            conn = get_db_connection()
+            if conn:
+                cursor = conn.cursor()
+                timestamp = datetime.now().isoformat()
+                
+                cursor.execute('''
+                    INSERT INTO weather_data (
+                        timestamp, temperature, feels_like, humidity, pressure, visibility, uv_index,
+                        clouds, wind_speed, wind_direction, weather_main, weather_description,
+                        weather_icon, sunrise, sunset, city, country, api_response
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    timestamp,
+                    weather_info['temperature'],
+                    weather_info['feels_like'],
+                    weather_info['humidity'],
+                    weather_info['pressure'],
+                    weather_info['visibility'],
+                    weather_info['uv_index'],
+                    weather_info['clouds'],
+                    weather_info['wind_speed'],
+                    weather_info['wind_direction'],
+                    weather_info['weather_main'],
+                    weather_info['weather_description'],
+                    weather_info['weather_icon'],
+                    weather_info['sunrise'],
+                    weather_info['sunset'],
+                    weather_info['city'],
+                    weather_info['country'],
+                    json.dumps(weather_info)
+                ))
+                
+                conn.commit()
+                conn.close()
+                
+                print(f"✅ Weather data stored: {weather_info['city']} - {weather_info['temperature']:.1f}°C, {weather_info['weather_description']}")
+            else:
+                print("❌ Failed to connect to database for weather data")
+                
+        else:
+            print(f"❌ Weather API error: {response.status_code}")
+            
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Weather API request failed: {e}")
+    except Exception as e:
+        print(f"❌ Error collecting weather data: {e}")
+
 def collect_data():
     """Main data collection function"""
     try:
@@ -259,6 +375,9 @@ def collect_data():
         
         # Also collect and store individual device data
         collect_and_store_device_data()
+        
+        # Collect weather data at the same frequency as solar data
+        collect_weather_data()
         
     except Exception as e:
         print(f"❌ Collection error: {e}")

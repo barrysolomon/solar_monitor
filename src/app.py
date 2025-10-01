@@ -60,6 +60,87 @@ def get_db_connection():
     except:
         return None
 
+def init_weather_table():
+    """Initialize weather data table if it doesn't exist"""
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS weather_data (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    temperature REAL,
+                    feels_like REAL,
+                    humidity INTEGER,
+                    pressure INTEGER,
+                    visibility INTEGER,
+                    uv_index REAL,
+                    clouds INTEGER,
+                    wind_speed REAL,
+                    wind_direction INTEGER,
+                    weather_main TEXT,
+                    weather_description TEXT,
+                    weather_icon TEXT,
+                    sunrise INTEGER,
+                    sunset INTEGER,
+                    city TEXT,
+                    country TEXT,
+                    api_response TEXT
+                )
+            ''')
+            
+            # Create index for faster queries
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_weather_timestamp 
+                ON weather_data(timestamp)
+            ''')
+            
+            conn.commit()
+            print("Weather data table initialized successfully")
+        except sqlite3.Error as e:
+            print(f"Error initializing weather table: {e}")
+        finally:
+            conn.close()
+
+def store_weather_data(weather_data):
+    """Store weather data in the database"""
+    conn = get_db_connection()
+    if conn and weather_data.get('success'):
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO weather_data (
+                    temperature, feels_like, humidity, pressure, visibility, uv_index,
+                    clouds, wind_speed, wind_direction, weather_main, weather_description,
+                    weather_icon, sunrise, sunset, city, country, api_response
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                weather_data.get('temperature'),
+                weather_data.get('feels_like'),
+                weather_data.get('humidity'),
+                weather_data.get('pressure'),
+                weather_data.get('visibility'),
+                weather_data.get('uv_index'),
+                weather_data.get('clouds'),
+                weather_data.get('wind_speed'),
+                weather_data.get('wind_direction'),
+                weather_data.get('main'),
+                weather_data.get('description'),
+                weather_data.get('icon'),
+                weather_data.get('sunrise'),
+                weather_data.get('sunset'),
+                weather_data.get('city'),
+                weather_data.get('country'),
+                json.dumps(weather_data)  # Store full API response for future analysis
+            ))
+            conn.commit()
+            print(f"Weather data stored: {weather_data.get('city')} - {weather_data.get('temperature')}°C")
+        except sqlite3.Error as e:
+            print(f"Error storing weather data: {e}")
+        finally:
+            conn.close()
+
 @app.route('/')
 def index():
     page = request.args.get('page', 'overview')
@@ -146,6 +227,7 @@ def index():
             border: 1px solid rgba(255,255,255,0.2);
             border-radius: 8px;
             padding: 6px 10px;
+            position: relative;
         }}
         .status-group-title {{
             font-size: 0.75em;
@@ -182,6 +264,7 @@ def index():
         .status-item span:first-child {{
             font-size: 10px;
         }}
+        
         
         .content {{
             padding: 30px;
@@ -234,8 +317,29 @@ def index():
             100% {{ left: 100%; opacity: 0; }}
         }}
         
+        /* Weather-based Sky Backgrounds */
         .sky-background.day {{
             background: linear-gradient(135deg, #87CEEB 0%, #98FB98 100%);
+        }}
+        
+        .sky-background.day.clear {{
+            background: linear-gradient(135deg, #87CEEB 0%, #98FB98 100%);
+        }}
+        
+        .sky-background.day.clouds {{
+            background: linear-gradient(135deg, #B0C4DE 0%, #D3D3D3 50%, #87CEEB 100%);
+        }}
+        
+        .sky-background.day.rain {{
+            background: linear-gradient(135deg, #708090 0%, #778899 50%, #696969 100%);
+        }}
+        
+        .sky-background.day.snow {{
+            background: linear-gradient(135deg, #F0F8FF 0%, #E6E6FA 50%, #D3D3D3 100%);
+        }}
+        
+        .sky-background.day.thunderstorm {{
+            background: linear-gradient(135deg, #2F4F4F 0%, #696969 50%, #708090 100%);
         }}
         
         .sky-background.dawn {{
@@ -248,6 +352,94 @@ def index():
         
         .sky-background.night {{
             background: linear-gradient(135deg, #191970 0%, #000080 50%, #483D8B 100%);
+        }}
+        
+        .sky-background.night.clear {{
+            background: linear-gradient(135deg, #191970 0%, #000080 50%, #483D8B 100%);
+        }}
+        
+        .sky-background.night.clouds {{
+            background: linear-gradient(135deg, #2F2F2F 0%, #404040 50%, #1C1C1C 100%);
+        }}
+        
+        .sky-background.night.rain {{
+            background: linear-gradient(135deg, #1C1C1C 0%, #2F2F2F 50%, #404040 100%);
+        }}
+        
+        /* Weather Display Styles */
+        .weather-display {{
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 0.9em;
+            color: #333;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            max-width: 250px;
+        }}
+        
+        .weather-display.error {{
+            background: rgba(255, 243, 205, 0.95);
+            border: 1px solid #f39c12;
+        }}
+        
+        .weather-display.disabled {{
+            background: rgba(236, 240, 241, 0.9);
+            border: 1px solid #bdc3c7;
+        }}
+        
+        .weather-icon {{
+            font-size: 1.2em;
+        }}
+        
+        .weather-temp {{
+            font-weight: bold;
+            color: #2c3e50;
+        }}
+        
+        .weather-desc {{
+            font-size: 0.8em;
+            color: #666;
+            text-transform: capitalize;
+        }}
+        
+        .weather-error {{
+            font-size: 0.8em;
+            color: #e67e22;
+            text-align: center;
+        }}
+        
+        .weather-config-link {{
+            color: #3498db;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 0.8em;
+        }}
+        
+        .weather-config-link:hover {{
+            color: #2980b9;
+            text-decoration: underline;
+        }}
+        
+        .weather-setup-btn {{
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.7em;
+            cursor: pointer;
+            margin-top: 4px;
+        }}
+        
+        .weather-setup-btn:hover {{
+            background: #2980b9;
         }}
         
         .celestial-body.sun {{
@@ -604,7 +796,7 @@ def index():
                     <div style="font-size: 0.9em; color: #ffffff; opacity: 0.9; margin-top: 2px;" id="page-subtitle">
                         {'⚙️ System Overview & Management - Monitor system status and manage configuration' if page == 'system' 
                          else '🗃️ Database & Data Management - Database statistics, query tools, and data export' if page == 'data'
-                         else '⚡ Inverters & Panels - Monitor individual inverter performance and status' if page == 'devices'
+                         else '⚡ Inverter Performance - Monitor individual inverter performance and status' if page == 'devices'
                          else '📊 Analytics & Charts - Historical data analysis and performance trends' if page == 'analytics'
                          else '🔌 API Documentation - Interactive API explorer and testing interface' if page == 'api'
                          else '❓ Help & Documentation - System guides and troubleshooting information' if page == 'help'
@@ -620,9 +812,10 @@ def index():
                 
                 <!-- System Dropdown Menu -->
                 <div class="system-dropdown">
-                    <a href="/?page=system" class="nav-btn system-btn {'active' if page in ['system', 'data', 'api'] else ''}">⚙️ System ▼</a>
+                    <a href="/?page=system" class="nav-btn system-btn {'active' if page in ['system', 'data', 'api', 'config'] else ''}">⚙️ System ▼</a>
                     <div class="system-menu">
                         <a href="/?page=system" class="system-item {'active' if page == 'system' else ''}">⚙️ System</a>
+                        <a href="/?page=config" class="system-item {'active' if page == 'config' else ''}">🔧 Configuration</a>
                         <a href="/?page=data" class="system-item {'active' if page == 'data' else ''}">🗃️ Database</a>
                         <a href="/?page=api" class="system-item {'active' if page == 'api' else ''}">🔌 API</a>
                     </div>
@@ -632,6 +825,8 @@ def index():
             </div>
                 <div class="system-status-group">
                     <div class="status-group-title">System Status</div>
+                    
+                    
             <div class="status-bar">
                 <div class="status-item">
                     <span id="pvs6-icon">🔴</span>
@@ -907,6 +1102,19 @@ def get_page_content(page):
             <!-- Sky Background with Time-based Gradient -->
             <div class="sky-background" id="sky-background" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 20px; transition: background 2s ease-in-out; z-index: 1;"></div>
             
+            <!-- Weather Display -->
+            <div class="weather-display" id="weather-display" style="display: none;">
+                <div class="weather-icon" id="weather-icon">☀️</div>
+                <div id="weather-content">
+                    <div class="weather-temp" id="weather-temp">--°C</div>
+                    <div class="weather-desc" id="weather-desc">Loading...</div>
+                </div>
+                <div id="weather-error-content" style="display: none;">
+                    <div class="weather-error" id="weather-error-message">Weather unavailable</div>
+                    <a href="/?page=system#weather-config" class="weather-config-link" id="weather-config-link">Configure Weather</a>
+                </div>
+            </div>
+            
             <!-- 5-Column Grid Container (Clean Final Layout) -->
             <div style="display: grid; grid-template-columns: 0.6fr 1fr 1.4fr 1fr 0.6fr; grid-template-rows: 100px 120px 150px; gap: 15px; position: relative; z-index: 2; padding: 30px 0;">
                 
@@ -942,7 +1150,7 @@ def get_page_content(page):
                     </div>
                     
                     <!-- Production Number Overlay (Green) -->
-                    <div class="production-overlay" id="production-overlay" style="background: rgba(46, 204, 113, 0.9); padding: 6px 12px; border-radius: 15px; font-weight: bold; font-size: 1.1em; color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.2); margin-top: 10px;">
+                    <div class="production-overlay" id="production-overlay" style="background: rgba(46, 204, 113, 0.9); padding: 3px 8px; border-radius: 10px; font-weight: bold; font-size: 0.8em; color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.2); margin-top: 10px;">
                         <span id="visual-production">-- kW</span>
                     </div>
                 </div>
@@ -950,7 +1158,7 @@ def get_page_content(page):
                 <!-- Row 3, Col 2: Hobbit House (Centered) -->
                 <div style="grid-column: 2; grid-row: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
                     <img src="/static/images/Hobbit House.png" alt="Solar Powered Hobbit House" style="width: 150px; height: auto; background: none; border: none; box-shadow: none;">
-                    <div class="house-consumption" style="position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%); background: rgba(52, 152, 219, 0.9); color: white; padding: 3px 8px; border-radius: 10px; font-weight: bold; font-size: 0.8em;">
+                    <div class="house-consumption" style="position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%); background: rgba(52, 152, 219, 0.9); color: white; padding: 3px 8px; border-radius: 10px; font-weight: bold; font-size: 0.8em;">
                         <span id="visual-consumption">-- kW</span>
                     </div>
                 </div>
@@ -966,7 +1174,7 @@ def get_page_content(page):
                     </div>
                     
                     <!-- Grid Flow Amount and Direction -->
-                    <div class="grid-flow-info" id="grid-flow-info" style="background: rgba(39, 174, 96, 0.9); color: white; padding: 4px 8px; border-radius: 12px; font-weight: bold; font-size: 0.9em;">
+                    <div class="grid-flow-info" id="grid-flow-info" style="background: rgba(39, 174, 96, 0.9); color: white; padding: 3px 8px; border-radius: 10px; font-weight: bold; font-size: 0.8em;">
                         <span id="visual-grid-flow">-- kW</span>
                         <span id="visual-grid-direction" style="margin-left: 6px;">➡️</span>
                     </div>
@@ -987,8 +1195,6 @@ def get_page_content(page):
     elif page == 'devices':
         return '''
         <div class="page-header" style="text-align: center; margin-bottom: 30px;">
-            <h2>⚡ Inverters & Panels</h2>
-            <p style="color: #666; font-size: 1.1em;">Monitor inverter performance and solar panel status</p>
         </div>
         
         <!-- Performance Summary Dashboard -->
@@ -1080,13 +1286,26 @@ def get_page_content(page):
                 <h3>📈 Power Flow Analysis</h3>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                     <select id="time-period" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;">
+                        <option value="15min">Last 15 Minutes</option>
+                        <option value="30min">Last 30 Minutes</option>
                         <option value="1h">Last Hour</option>
+                        <option value="2h">Last 2 Hours</option>
                         <option value="4h">Last 4 Hours</option>
+                        <option value="6h">Last 6 Hours</option>
                         <option value="12h">Last 12 Hours</option>
-                        <option value="24h">Last Day</option>
-                        <option value="7d">Last Week</option>
-                        <option value="30d">Last Month</option>
-                        <option value="1y">Last Year</option>
+                        <option value="today">Today</option>
+                        <option value="24h">Last 24 Hours</option>
+                        <option value="2d">Last 2 Days</option>
+                        <option value="3d">Last 3 Days</option>
+                        <option value="thisweek">This Week</option>
+                        <option value="7d">Last 7 Days</option>
+                        <option value="2w">Last 2 Weeks</option>
+                        <option value="thismonth">This Month</option>
+                        <option value="30d">Last 30 Days</option>
+                        <option value="3m">Last 3 Months</option>
+                        <option value="6m">Last 6 Months</option>
+                        <option value="thisyear">This Year</option>
+                        <option value="1y">Last 365 Days</option>
                     </select>
                     <select id="chart-type" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;">
                         <option value="line">Line Chart</option>
@@ -1094,6 +1313,7 @@ def get_page_content(page):
                         <option value="bar">Bar Chart</option>
                     </select>
                     <select id="granularity" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;">
+                        <option value="30sec">30 Seconds</option>
                         <option value="minute">Minute</option>
                         <option value="15min">15 Minutes</option>
                         <option value="hour" selected>Hour</option>
@@ -1102,6 +1322,10 @@ def get_page_content(page):
                         <option value="month">Month</option>
                         <option value="year">Year</option>
                     </select>
+                    <label style="display: flex; align-items: center; gap: 5px; font-size: 0.9em; color: #666;">
+                        <input type="checkbox" id="show-dots" checked style="margin: 0;">
+                        Show Dots
+                    </label>
         </div>
             </div>
         </div>
@@ -1128,6 +1352,219 @@ def get_page_content(page):
         </div>
         
         '''
+    elif page == 'config':
+        return '''
+        
+        <!-- Configuration Page -->
+        <div class="info-card" style="margin-bottom: 30px;">
+            <h3>🔧 System Configuration</h3>
+            <p style="color: #666; font-size: 1.1em;">Configure your solar monitoring system settings</p>
+        </div>
+
+        <!-- PVS6 Gateway Configuration -->
+        <div class="info-card" style="margin-bottom: 30px;">
+            <h3>📡 PVS6 Gateway Settings</h3>
+            <div class="config-section">
+                <div class="config-row">
+                    <label for="pvs6-serial">Serial Number:</label>
+                    <input type="text" id="pvs6-serial" placeholder="Enter PVS6 serial number">
+                </div>
+                <div class="config-row">
+                    <label for="pvs6-wifi-ssid">WiFi SSID:</label>
+                    <input type="text" id="pvs6-wifi-ssid" placeholder="Enter WiFi network name">
+                </div>
+                <div class="config-row">
+                    <label for="pvs6-wifi-password">WiFi Password:</label>
+                    <input type="password" id="pvs6-wifi-password" placeholder="Enter WiFi password">
+                </div>
+                <div class="config-row">
+                    <label for="pvs6-ip">IP Address:</label>
+                    <input type="text" id="pvs6-ip" placeholder="Enter PVS6 IP address">
+                </div>
+            </div>
+        </div>
+
+        <!-- Weather Configuration -->
+        <div class="info-card" style="margin-bottom: 30px;">
+            <h3>🌤️ Weather Integration</h3>
+            <div class="config-section">
+                <div class="config-row">
+                    <label for="weather-enabled">
+                        <input type="checkbox" id="weather-enabled"> Enable Weather Integration
+                    </label>
+                </div>
+                <div class="config-row">
+                    <label for="weather-api-key">OpenWeatherMap API Key:</label>
+                    <input type="password" id="weather-api-key" placeholder="Enter your API key">
+                    <small>Get a free API key at <a href="https://openweathermap.org/api" target="_blank">openweathermap.org</a></small>
+                </div>
+                <div class="config-row">
+                    <label for="weather-latitude">Latitude:</label>
+                    <input type="number" id="weather-latitude" step="0.000001" placeholder="39.7392">
+                </div>
+                <div class="config-row">
+                    <label for="weather-longitude">Longitude:</label>
+                    <input type="number" id="weather-longitude" step="0.000001" placeholder="-104.9903">
+                </div>
+            </div>
+        </div>
+
+        <!-- Database Configuration -->
+        <div class="info-card" style="margin-bottom: 30px;">
+            <h3>🗃️ Database Settings</h3>
+            <div class="config-section">
+                <div class="config-row">
+                    <label for="db-path">Database Path:</label>
+                    <input type="text" id="db-path" placeholder="/opt/solar_monitor/solar_data.db">
+                </div>
+                <div class="config-row">
+                    <label for="backup-path">Backup Path:</label>
+                    <input type="text" id="backup-path" placeholder="/opt/solar_monitor/backups">
+                </div>
+                <div class="config-row">
+                    <label for="collector-interval">Data Collection Interval (seconds):</label>
+                    <input type="number" id="collector-interval" min="30" max="3600" placeholder="60">
+                </div>
+            </div>
+        </div>
+
+        <!-- System Configuration -->
+        <div class="info-card" style="margin-bottom: 30px;">
+            <h3>⚙️ System Settings</h3>
+            <div class="config-section">
+                <div class="config-row">
+                    <label for="system-timezone">Timezone:</label>
+                    <select id="system-timezone">
+                        <option value="America/Denver">America/Denver (MDT/MST)</option>
+                        <option value="America/New_York">America/New_York (EDT/EST)</option>
+                        <option value="America/Chicago">America/Chicago (CDT/CST)</option>
+                        <option value="America/Los_Angeles">America/Los_Angeles (PDT/PST)</option>
+                        <option value="America/Phoenix">America/Phoenix (MST)</option>
+                        <option value="UTC">UTC</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuration Actions -->
+        <div class="info-card">
+            <h3>💾 Configuration Actions</h3>
+            <div class="config-actions">
+                <button onclick="loadConfiguration()" class="btn btn-secondary">🔄 Load Current Settings</button>
+                <button onclick="saveConfiguration()" class="btn btn-primary">💾 Save Configuration</button>
+                <button onclick="resetConfiguration()" class="btn btn-warning">🔄 Reset to Defaults</button>
+                <button onclick="testConfiguration()" class="btn btn-info">🧪 Test Connection</button>
+            </div>
+        </div>
+
+        <style>
+        .config-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .config-row {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .config-row label {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .config-row input, .config-row select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .config-row input:focus, .config-row select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+        
+        .config-row small {
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .config-row small a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        .config-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5a6fd8;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+        
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+        
+        .btn-info:hover {
+            background: #138496;
+        }
+        
+        @media (max-width: 768px) {
+            .config-actions {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+                text-align: center;
+            }
+        }
+        </style>
+        '''
+
     elif page == 'system':
         return '''
         
@@ -1164,7 +1601,25 @@ def get_page_content(page):
                             <div style="font-size: 1.1em; font-weight: 600;" id="pvs6-signal-status">Loading...</div>
                         </div>
                     </div>
-        </div>
+                </div>
+                
+                <!-- Weather Configuration Section -->
+                <div id="weather-config" style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h4 style="margin-bottom: 15px; color: #2c3e50; font-size: 1.1em;">🌤️ Weather Integration</h4>
+                    <div id="weather-config-content">
+                        <div style="background: white; padding: 15px; border-radius: 6px; border-left: 4px solid #f39c12;">
+                            <div style="font-size: 0.9em; color: #666; margin-bottom: 10px;">Weather Status</div>
+                            <div style="font-size: 1em; margin-bottom: 10px;" id="weather-status">Loading...</div>
+                            <div style="font-size: 0.8em; color: #666; line-height: 1.4;" id="weather-instructions">
+                                Weather integration provides real-time weather data and dynamic sky backgrounds.
+                            </div>
+                            <div style="margin-top: 10px;">
+                                <a href="https://openweathermap.org/api" target="_blank" class="weather-setup-btn" style="margin-right: 10px;">Get Free API Key</a>
+                                <button onclick="checkWeatherConfig()" class="weather-setup-btn" style="background: #27ae60;">Check Status</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
         
                 <!-- Data Collection Section -->
                 <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
@@ -1397,6 +1852,12 @@ def get_page_content(page):
                         <small style="color: #666;">How often to collect data (30-300 seconds)</small>
                     </div>
                     
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 5px;">🌤️ Weather API Key (Optional):</label>
+                        <input type="text" id="weather-api-key" placeholder="Enter OpenWeatherMap API key" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                        <small style="color: #666;">Get free API key from <a href="https://openweathermap.org/api" target="_blank" style="color: #3498db;">OpenWeatherMap</a> for weather display</small>
+                    </div>
+                    
                     <div style="display: flex; gap: 10px; justify-content: flex-end;">
                         <button type="button" onclick="hideConfigSetup()" style="padding: 10px 20px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer;">Cancel</button>
                         <button type="button" onclick="saveConfiguration()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer;">💾 Save Configuration</button>
@@ -1443,6 +1904,7 @@ def get_page_content(page):
                     <li><strong>Solar Data:</strong> Time-series production/consumption data (many records over time)</li>
                     <li><strong>Device Data:</strong> Inverter specifications and current status (1 record per inverter)</li>
                     <li><strong>System Status:</strong> System-level status and health information</li>
+                    <li><strong>Weather Data:</strong> Historical weather conditions and meteorological data</li>
                 </ul>
             </div>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
@@ -1452,6 +1914,7 @@ def get_page_content(page):
                         <option value="solar_data">Solar Data (System Overview)</option>
                         <option value="device_data">Device Data (Individual Devices)</option>
                         <option value="system_status">System Status</option>
+                        <option value="weather_data">Weather Data (Historical Weather)</option>
                     </select>
                 </div>
                 <div>
@@ -1522,7 +1985,8 @@ def get_page_content(page):
                     <button class="btn" onclick="loadQueryTemplate('recent')" style="margin-right: 5px; background: #27ae60;">📈 Recent Production</button>
                     <button class="btn" onclick="loadQueryTemplate('devices')" style="margin-right: 5px; background: #3498db;">🔌 Device Summary</button>
                     <button class="btn" onclick="loadQueryTemplate('hourly')" style="margin-right: 5px; background: #e67e22;">⏰ Hourly Totals</button>
-                    <button class="btn" onclick="loadQueryTemplate('top')" style="background: #9b59b6;">🏆 Top Producers</button>
+                    <button class="btn" onclick="loadQueryTemplate('top')" style="margin-right: 5px; background: #9b59b6;">🏆 Top Producers</button>
+                    <button class="btn" onclick="loadQueryTemplate('weather')" style="background: #17a2b8;">🌤️ Weather Data</button>
                 </div>
             </div>
             
@@ -1849,7 +2313,7 @@ LIMIT 50;</textarea>
             
         <!-- Devices Page Help -->
         <div class="info-card" id="devices-help" style="margin-bottom: 30px;">
-            <h3>⚡ Inverters & Panels</h3>
+            <h3>⚡ Inverter Performance</h3>
             <p>Monitor individual inverter performance and run diagnostics.</p>
             
             <h4>📊 Summary Dashboard</h4>
@@ -2138,6 +2602,11 @@ def get_page_script(page):
         
         async function loadCurrentData() {
             try {
+                // Fetch weather data if needed (initial load or expired)
+                if (!weatherData || (Date.now() - lastWeatherUpdate) > WEATHER_UPDATE_INTERVAL) {
+                    fetchWeatherData();
+                }
+                
                 const response = await fetch('/api/current_status');
                 const data = await response.json();
                 
@@ -2212,6 +2681,140 @@ def get_page_script(page):
             updateVisualData(data);
         }
         
+        // Weather data cache
+        let weatherData = null;
+        let lastWeatherUpdate = 0;
+        const WEATHER_UPDATE_INTERVAL = 10 * 60 * 1000; // 10 minutes
+        
+        function getWeatherIcon(weatherMain, icon) {
+            const iconMap = {
+                'Clear': '☀️',
+                'Clouds': '☁️',
+                'Rain': '🌧️',
+                'Drizzle': '🌦️',
+                'Thunderstorm': '⛈️',
+                'Snow': '❄️',
+                'Mist': '🌫️',
+                'Smoke': '🌫️',
+                'Haze': '🌫️',
+                'Dust': '🌫️',
+                'Fog': '🌫️',
+                'Sand': '🌫️',
+                'Ash': '🌫️',
+                'Squall': '💨',
+                'Tornado': '🌪️'
+            };
+            
+            // Use night versions if icon ends with 'n'
+            if (icon && icon.endsWith('n')) {
+                if (weatherMain === 'Clear') return '🌙';
+                if (weatherMain === 'Clouds') return '☁️';
+            }
+            
+            return iconMap[weatherMain] || '🌤️';
+        }
+        
+        function getWeatherClass(weatherMain) {
+            const classMap = {
+                'Clear': 'clear',
+                'Clouds': 'clouds',
+                'Rain': 'rain',
+                'Drizzle': 'rain',
+                'Thunderstorm': 'thunderstorm',
+                'Snow': 'snow',
+                'Mist': 'clouds',
+                'Smoke': 'clouds',
+                'Haze': 'clouds',
+                'Dust': 'clouds',
+                'Fog': 'clouds',
+                'Sand': 'clouds',
+                'Ash': 'clouds',
+                'Squall': 'clouds',
+                'Tornado': 'thunderstorm'
+            };
+            return classMap[weatherMain] || 'clear';
+        }
+        
+        async function fetchWeatherData() {
+            try {
+                console.log('Fetching weather data...');
+                const response = await fetch('/api/weather');
+                const data = await response.json();
+                console.log('Weather API response:', data);
+                
+                if (data.success) {
+                    weatherData = data;
+                    lastWeatherUpdate = Date.now();
+                    updateWeatherDisplay(data);
+                    return data;
+                } else {
+                    console.warn('Weather API error:', data.error);
+                    updateWeatherDisplay(data); // Show error state
+                    return data;
+                }
+            } catch (error) {
+                console.warn('Failed to fetch weather:', error);
+                return null;
+            }
+        }
+        
+        function updateWeatherDisplay(weather) {
+            const weatherDisplay = document.getElementById('weather-display');
+            const weatherIcon = document.getElementById('weather-icon');
+            const weatherContent = document.getElementById('weather-content');
+            const weatherErrorContent = document.getElementById('weather-error-content');
+            const weatherTemp = document.getElementById('weather-temp');
+            const weatherDesc = document.getElementById('weather-desc');
+            const weatherErrorMessage = document.getElementById('weather-error-message');
+            const weatherConfigLink = document.getElementById('weather-config-link');
+            
+            console.log('updateWeatherDisplay called with:', weather);
+            if (!weatherDisplay) {
+                console.log('Weather display element not found');
+                return;
+            }
+            
+            if (weather && weather.success) {
+                // Show successful weather data
+                weatherIcon.textContent = getWeatherIcon(weather.main, weather.icon);
+                weatherTemp.textContent = Math.round(weather.temperature) + '°C';
+                weatherDesc.textContent = weather.description;
+                
+                weatherDisplay.className = 'weather-display';
+                weatherContent.style.display = 'block';
+                weatherErrorContent.style.display = 'none';
+                weatherDisplay.style.display = 'flex';
+            } else if (weather && !weather.success) {
+                // Show error state with configuration link
+                weatherIcon.textContent = '⚠️';
+                
+                if (weather.error && weather.error.includes('API key not configured')) {
+                    weatherErrorMessage.textContent = 'Weather API key needed';
+                    weatherConfigLink.textContent = 'Get Free API Key';
+                    weatherConfigLink.href = 'https://openweathermap.org/api';
+                    weatherConfigLink.target = '_blank';
+                } else if (weather.error && weather.error.includes('disabled')) {
+                    weatherErrorMessage.textContent = 'Weather disabled';
+                    weatherConfigLink.textContent = 'Enable Weather';
+                    weatherConfigLink.href = '/?page=system#weather-config';
+                    weatherConfigLink.target = '';
+                } else {
+                    weatherErrorMessage.textContent = 'Weather API error';
+                    weatherConfigLink.textContent = 'Check Configuration';
+                    weatherConfigLink.href = '/?page=system#weather-config';
+                    weatherConfigLink.target = '';
+                }
+                
+                weatherDisplay.className = 'weather-display error';
+                weatherContent.style.display = 'none';
+                weatherErrorContent.style.display = 'block';
+                weatherDisplay.style.display = 'flex';
+            } else {
+                // Hide weather display if no data
+                weatherDisplay.style.display = 'none';
+            }
+        }
+        
         function updateCelestialPosition() {
             const now = new Date();
             const hour = now.getHours();
@@ -2222,6 +2825,11 @@ def get_page_script(page):
             const skyBackground = document.getElementById('sky-background');
             
             if (!celestialBody || !skyBackground) return;
+            
+            // Check if we need to update weather data
+            if (!weatherData || (Date.now() - lastWeatherUpdate) > WEATHER_UPDATE_INTERVAL) {
+                fetchWeatherData();
+            }
             
             const isDaytime = hour >= 6 && hour < 18;
             
@@ -2236,10 +2844,13 @@ def get_page_script(page):
                 celestialBody.style.left = sunPosition + '%';
                 celestialBody.style.transform = 'translateX(-50%) translateY(-50%)';
                 
+                // Apply weather-based sky backgrounds
+                const weatherClass = weatherData ? getWeatherClass(weatherData.main) : 'clear';
+                
                 if (hour >= 6 && hour < 8) {
                     skyBackground.className = 'sky-background dawn';
                 } else if (hour >= 8 && hour < 17) {
-                    skyBackground.className = 'sky-background day';
+                    skyBackground.className = `sky-background day ${weatherClass}`;
                 } else if (hour >= 17 && hour < 18) {
                     skyBackground.className = 'sky-background dusk';
                 }
@@ -2260,7 +2871,9 @@ def get_page_script(page):
                 celestialBody.style.left = moonPosition + '%';
                 celestialBody.style.transform = 'translateX(-50%) translateY(-50%)';
                 
-                skyBackground.className = 'sky-background night';
+                // Apply weather-based night sky
+                const weatherClass = weatherData ? getWeatherClass(weatherData.main) : 'clear';
+                skyBackground.className = `sky-background night ${weatherClass}`;
             }
         }
         
@@ -2907,14 +3520,237 @@ def get_page_script(page):
         }
         '''
 
+    elif page == 'config':
+        return '''
+        // Configuration page JavaScript functions
+        
+        async function loadConfiguration() {
+            try {
+                const response = await fetch('/api/config');
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Populate PVS6 settings
+                    document.getElementById('pvs6-serial').value = data.config.PVS6_SERIAL_NUMBER || '';
+                    document.getElementById('pvs6-wifi-ssid').value = data.config.PVS6_WIFI_SSID || '';
+                    document.getElementById('pvs6-wifi-password').value = data.config.PVS6_WIFI_PASSWORD || '';
+                    document.getElementById('pvs6-ip').value = data.config.PVS6_IP_ADDRESS || '';
+                    
+                    // Populate weather settings
+                    document.getElementById('weather-enabled').checked = (data.config.WEATHER_ENABLED || 'true') === 'true';
+                    document.getElementById('weather-api-key').value = data.config.WEATHER_API_KEY || '';
+                    document.getElementById('weather-latitude').value = data.config.WEATHER_LATITUDE || '';
+                    document.getElementById('weather-longitude').value = data.config.WEATHER_LONGITUDE || '';
+                    
+                    // Populate database settings
+                    document.getElementById('db-path').value = data.config.DATABASE_PATH || '';
+                    document.getElementById('backup-path').value = data.config.BACKUP_PATH || '';
+                    document.getElementById('collector-interval').value = data.config.COLLECTOR_INTERVAL || '';
+                    
+                    // Populate system settings
+                    document.getElementById('system-timezone').value = data.config.SYSTEM_TIMEZONE || '';
+                    
+                    showNotification('Configuration loaded successfully', 'success');
+                } else {
+                    showNotification('Failed to load configuration: ' + data.error, 'error');
+                }
+            } catch (error) {
+                console.error('Error loading configuration:', error);
+                showNotification('Error loading configuration', 'error');
+            }
+        }
+        
+        async function saveConfiguration() {
+            try {
+                const config = {
+                    PVS6_SERIAL_NUMBER: document.getElementById('pvs6-serial').value,
+                    PVS6_WIFI_SSID: document.getElementById('pvs6-wifi-ssid').value,
+                    PVS6_WIFI_PASSWORD: document.getElementById('pvs6-wifi-password').value,
+                    PVS6_IP_ADDRESS: document.getElementById('pvs6-ip').value,
+                    WEATHER_ENABLED: document.getElementById('weather-enabled').checked ? 'true' : 'false',
+                    WEATHER_API_KEY: document.getElementById('weather-api-key').value,
+                    WEATHER_LATITUDE: document.getElementById('weather-latitude').value,
+                    WEATHER_LONGITUDE: document.getElementById('weather-longitude').value,
+                    DATABASE_PATH: document.getElementById('db-path').value,
+                    BACKUP_PATH: document.getElementById('backup-path').value,
+                    COLLECTOR_INTERVAL: document.getElementById('collector-interval').value,
+                    SYSTEM_TIMEZONE: document.getElementById('system-timezone').value
+                };
+                
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification('Configuration saved successfully', 'success');
+                } else {
+                    showNotification('Failed to save configuration: ' + data.error, 'error');
+                }
+            } catch (error) {
+                console.error('Error saving configuration:', error);
+                showNotification('Error saving configuration', 'error');
+            }
+        }
+        
+        async function resetConfiguration() {
+            if (confirm('Are you sure you want to reset all configuration to defaults? This cannot be undone.')) {
+                try {
+                    // Reset all form fields to defaults
+                    document.getElementById('pvs6-serial').value = '';
+                    document.getElementById('pvs6-wifi-ssid').value = 'SunPower12345';
+                    document.getElementById('pvs6-wifi-password').value = '';
+                    document.getElementById('pvs6-ip').value = '172.27.152.1';
+                    document.getElementById('weather-enabled').checked = true;
+                    document.getElementById('weather-api-key').value = '';
+                    document.getElementById('weather-latitude').value = '39.7392';
+                    document.getElementById('weather-longitude').value = '-104.9903';
+                    document.getElementById('db-path').value = '/opt/solar_monitor/solar_data.db';
+                    document.getElementById('backup-path').value = '/opt/solar_monitor/backups';
+                    document.getElementById('collector-interval').value = '60';
+                    document.getElementById('system-timezone').value = 'America/Denver';
+                    
+                    showNotification('Configuration reset to defaults', 'info');
+                } catch (error) {
+                    console.error('Error resetting configuration:', error);
+                    showNotification('Error resetting configuration', 'error');
+                }
+            }
+        }
+        
+        async function testConfiguration() {
+            try {
+                showNotification('Testing PVS6 connection...', 'info');
+                
+                const response = await fetch('/api/pvs6/status');
+                const data = await response.json();
+                
+                if (data.success && data.pvs_online) {
+                    showNotification('PVS6 connection test successful!', 'success');
+                } else {
+                    showNotification('PVS6 connection test failed. Check your settings.', 'warning');
+                }
+            } catch (error) {
+                console.error('Error testing configuration:', error);
+                showNotification('Error testing configuration', 'error');
+            }
+        }
+        
+        function showNotification(message, type) {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.textContent = message;
+            
+            // Style the notification
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 4px;
+                color: white;
+                font-weight: bold;
+                z-index: 10000;
+                max-width: 300px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                transition: all 0.3s ease;
+            `;
+            
+            // Set background color based on type
+            switch (type) {
+                case 'success':
+                    notification.style.backgroundColor = '#28a745';
+                    break;
+                case 'error':
+                    notification.style.backgroundColor = '#dc3545';
+                    break;
+                case 'warning':
+                    notification.style.backgroundColor = '#ffc107';
+                    notification.style.color = '#212529';
+                    break;
+                case 'info':
+                    notification.style.backgroundColor = '#17a2b8';
+                    break;
+                default:
+                    notification.style.backgroundColor = '#6c757d';
+            }
+            
+            // Add to page
+            document.body.appendChild(notification);
+            
+            // Remove after 5 seconds
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 5000);
+        }
+        
+        // Load configuration when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadConfiguration();
+        });
+        '''
+
     elif page == 'system':
         return '''
         function refreshNow() {
             refreshSystemInfo();
         }
         
+        async function checkWeatherConfig() {
+            try {
+                const response = await fetch('/api/weather/config');
+                const config = await response.json();
+                
+                const statusEl = document.getElementById('weather-status');
+                const instructionsEl = document.getElementById('weather-instructions');
+                
+                if (config.success) {
+                    if (!config.enabled) {
+                        statusEl.innerHTML = '❌ <span style="color: #e74c3c;">Disabled</span>';
+                        instructionsEl.innerHTML = 'Weather integration is disabled. Edit <code>/opt/solar_monitor/.env</code> and set <code>WEATHER_ENABLED=true</code>';
+                    } else if (!config.has_api_key) {
+                        statusEl.innerHTML = '⚠️ <span style="color: #f39c12;">API Key Required</span>';
+                        instructionsEl.innerHTML = 'Get a free API key from OpenWeatherMap and add <code>WEATHER_API_KEY=your_key_here</code> to <code>/opt/solar_monitor/.env</code>';
+                    } else {
+                        // Test the weather API
+                        const weatherResponse = await fetch('/api/weather');
+                        const weatherData = await weatherResponse.json();
+                        
+                        if (weatherData.success) {
+                            statusEl.innerHTML = '✅ <span style="color: #27ae60;">Working</span>';
+                            instructionsEl.innerHTML = `Weather integration is working! Current location: ${weatherData.city}, ${weatherData.country} (${config.latitude}, ${config.longitude})`;
+                        } else {
+                            statusEl.innerHTML = '❌ <span style="color: #e74c3c;">API Error</span>';
+                            instructionsEl.innerHTML = `Weather API error: ${weatherData.error}. Check your API key in <code>/opt/solar_monitor/.env</code>`;
+                        }
+                    }
+                } else {
+                    statusEl.innerHTML = '❌ <span style="color: #e74c3c;">Error</span>';
+                    instructionsEl.innerHTML = 'Failed to check weather configuration';
+                }
+            } catch (error) {
+                document.getElementById('weather-status').innerHTML = '❌ <span style="color: #e74c3c;">Error</span>';
+                document.getElementById('weather-instructions').innerHTML = 'Failed to check weather configuration: ' + error.message;
+            }
+        }
+        
         async function refreshSystemInfo() {
             try {
+                // Check weather config on page load
+                checkWeatherConfig();
+                
                 const [versionRes, uptimeRes, collectorRes, dbRes] = await Promise.all([
                     fetch('/api/version/current'),
                     fetch('/api/system/uptime'),
@@ -3621,6 +4457,7 @@ def get_page_script(page):
                         document.getElementById('pvs6-ip').value = data.config.PVS6_IP_ADDRESS || '172.27.152.1';
                         document.getElementById('system-timezone').value = data.config.SYSTEM_TIMEZONE || 'America/Los_Angeles';
                         document.getElementById('collector-interval').value = data.config.DATA_COLLECTION_INTERVAL || '60';
+                        document.getElementById('weather-api-key').value = data.config.WEATHER_API_KEY || '';
                     }
                     
                     // Always update status display
@@ -3715,7 +4552,8 @@ def get_page_script(page):
                 PVS6_WIFI_PASSWORD: document.getElementById('wifi-password').value.trim(),
                 PVS6_IP_ADDRESS: document.getElementById('pvs6-ip').value.trim(),
                 SYSTEM_TIMEZONE: document.getElementById('system-timezone').value,
-                DATA_COLLECTION_INTERVAL: document.getElementById('collector-interval').value
+                DATA_COLLECTION_INTERVAL: document.getElementById('collector-interval').value,
+                WEATHER_API_KEY: document.getElementById('weather-api-key').value.trim()
             };
             
             // Basic validation
@@ -4035,18 +4873,27 @@ def get_page_script(page):
             const chartType = document.getElementById('chart-type').value;
             const granularity = document.getElementById('granularity').value;
             
+            console.log('Loading analytics data with:', { period, chartType, granularity });
+            
             showChartLoading(true);
             
             try {
-                const response = await fetch(`/api/historical_data?period=${period}&granularity=${granularity}`);
+                const url = `/api/historical_data?period=${period}&granularity=${granularity}`;
+                console.log('Fetching from URL:', url);
+                
+                const response = await fetch(url);
                 const data = await response.json();
                 
+                console.log('API response:', { success: data.success, dataLength: data.data?.length });
+                
                 if (data.success && data.data) {
+                    console.log('Creating chart with', data.data.length, 'data points');
                     createChart(data.data, chartType);
                     updateSummaryStats(data.summary || {});
                     updateDetailedStats(data.details || {});
                 } else {
-                    showChartError('Failed to load data');
+                    console.error('API returned error:', data.error || 'No data');
+                    showChartError('Failed to load data: ' + (data.error || 'No data available'));
                 }
             } catch (error) {
                 console.error('Analytics data error:', error);
@@ -4074,6 +4921,12 @@ def get_page_script(page):
             const ctx = canvas.getContext('2d');
             const config = chartConfigs[type] || chartConfigs.line;
             
+            // Check show dots setting
+            const showDotsEl = document.getElementById('show-dots');
+            const showDots = showDotsEl ? showDotsEl.checked : true;
+            const pointRadius = showDots ? 3 : 0;
+            const pointHoverRadius = showDots ? 5 : 3;
+            
             window.analyticsChart = new Chart(ctx, {
                 ...config,
                 data: {
@@ -4085,7 +4938,9 @@ def get_page_script(page):
                         backgroundColor: type === 'area' ? 'rgba(39, 174, 96, 0.3)' : 'rgba(39, 174, 96, 0.1)',
                         borderWidth: 2,
                         fill: type === 'area',
-                        tension: 0.4
+                        tension: 0.4,
+                        pointRadius: pointRadius,
+                        pointHoverRadius: pointHoverRadius
                     }, {
                         label: 'Consumption (kW)',
                         data: data.map(d => d.consumption_kw),
@@ -4093,7 +4948,9 @@ def get_page_script(page):
                         backgroundColor: type === 'area' ? 'rgba(231, 76, 60, 0.3)' : 'rgba(231, 76, 60, 0.1)',
                         borderWidth: 2,
                         fill: type === 'area',
-                        tension: 0.4
+                        tension: 0.4,
+                        pointRadius: pointRadius,
+                        pointHoverRadius: pointHoverRadius
                     }, {
                         label: 'Grid Export (-) / Import (+)',
                         data: data.map(d => -d.net_export_kw), // Invert: export negative, import positive
@@ -4102,6 +4959,8 @@ def get_page_script(page):
                         borderWidth: 2,
                         fill: type === 'area',
                         tension: 0.4,
+                        pointRadius: pointRadius,
+                        pointHoverRadius: pointHoverRadius,
                         segment: {
                             borderColor: ctx => {
                                 const value = ctx.p1.parsed.y;
@@ -4203,6 +5062,13 @@ def get_page_script(page):
             const period = document.getElementById('time-period').value;
             const granularity = document.getElementById('granularity').value;
             console.log('Selected period:', period, 'granularity:', granularity);
+            
+            // Ensure elements exist
+            if (!document.getElementById('time-period') || !document.getElementById('granularity')) {
+                console.error('Chart control elements not found');
+                return;
+            }
+            
             loadAnalyticsData();
         }
         
@@ -4441,8 +5307,15 @@ def get_page_script(page):
         
         // Chart resizing functions
         function resizeChart() {
-            const height = document.getElementById('chart-height').value;
+            const heightEl = document.getElementById('chart-height');
             const container = document.getElementById('chart-container');
+            
+            if (!heightEl || !container) {
+                console.warn('Chart resize elements not found');
+                return;
+            }
+            
+            const height = heightEl.value;
             container.style.height = height + 'px';
             
             // Resize the chart if it exists
@@ -4463,7 +5336,8 @@ def get_page_script(page):
                 container.style.top = 'auto';
                 container.style.left = 'auto';
                 container.style.width = 'auto';
-                container.style.height = document.getElementById('chart-height').value + 'px';
+                const heightEl = document.getElementById('chart-height');
+                container.style.height = (heightEl ? heightEl.value : '400') + 'px';
                 container.style.zIndex = 'auto';
                 container.style.background = 'transparent';
                 button.textContent = '⛶ Fullscreen';
@@ -4598,26 +5472,8 @@ def get_page_script(page):
             URL.revokeObjectURL(url);
         }
         
-        // Initialize analytics page
-        if (document.getElementById('analyticsChart')) {
-            // Load Chart.js if not already loaded
-            if (typeof Chart === 'undefined') {
-                const script = document.createElement('script');
-                script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
-                script.onload = () => {
-                    updateGranularitySuggestions(); // Set initial granularity options
-                    loadAnalyticsData();
-                    loadPerformanceSummary(); // Load performance summary on page load
-                };
-                document.head.appendChild(script);
-            } else {
-                updateGranularitySuggestions(); // Set initial granularity options
-                loadAnalyticsData();
-                loadPerformanceSummary(); // Load performance summary on page load
-            }
-            
-            // Auto-suggest granularity based on time period
-            function updateGranularitySuggestions() {
+        // Auto-suggest granularity based on time period
+        function updateGranularitySuggestions() {
                 const period = document.getElementById('time-period').value;
                 const granularitySelect = document.getElementById('granularity');
                 
@@ -4625,48 +5481,111 @@ def get_page_script(page):
                 let availableOptions = [];
                 let suggestedGranularity;
                 
-                if (period === '1h') {
+                if (period === '15min') {
                     availableOptions = [
+                        {value: '30sec', text: '30 Seconds'},
                         {value: 'minute', text: 'Minute'},
+                        {value: '5min', text: '5 Minutes'}
+                    ];
+                    suggestedGranularity = '30sec';
+                } else if (period === '30min') {
+                    availableOptions = [
+                        {value: '30sec', text: '30 Seconds'},
+                        {value: 'minute', text: 'Minute'},
+                        {value: '5min', text: '5 Minutes'},
                         {value: '15min', text: '15 Minutes'}
                     ];
                     suggestedGranularity = 'minute';
-                } else if (period === '4h') {
+                } else if (period === '1h') {
                     availableOptions = [
+                        {value: '30sec', text: '30 Seconds'},
                         {value: 'minute', text: 'Minute'},
+                        {value: '5min', text: '5 Minutes'},
                         {value: '15min', text: '15 Minutes'}
                     ];
+                    suggestedGranularity = '5min';
+                } else if (period === '2h') {
+                    availableOptions = [
+                        {value: '5min', text: '5 Minutes'},
+                        {value: '15min', text: '15 Minutes'},
+                        {value: '30min', text: '30 Minutes'}
+                    ];
                     suggestedGranularity = '15min';
+                } else if (period === '4h') {
+                    availableOptions = [
+                        {value: '15min', text: '15 Minutes'},
+                        {value: '30min', text: '30 Minutes'},
+                        {value: 'hour', text: 'Hour'}
+                    ];
+                    suggestedGranularity = '30min';
+                } else if (period === '6h') {
+                    availableOptions = [
+                        {value: '30min', text: '30 Minutes'},
+                        {value: 'hour', text: 'Hour'}
+                    ];
+                    suggestedGranularity = 'hour';
                 } else if (period === '12h') {
                     availableOptions = [
-                        {value: '15min', text: '15 Minutes'},
-                        {value: 'hour', text: 'Hour'}
-                    ];
-                    suggestedGranularity = '15min';
-                } else if (period === '24h') {
-                    availableOptions = [
-                        {value: '15min', text: '15 Minutes'},
+                        {value: '30min', text: '30 Minutes'},
                         {value: 'hour', text: 'Hour'}
                     ];
                     suggestedGranularity = 'hour';
-                } else if (period === '7d') {
+                } else if (period === 'today' || period === '24h') {
                     availableOptions = [
                         {value: 'hour', text: 'Hour'},
+                        {value: '2hour', text: '2 Hours'}
+                    ];
+                    suggestedGranularity = 'hour';
+                } else if (period === '2d') {
+                    availableOptions = [
+                        {value: 'hour', text: 'Hour'},
+                        {value: '2hour', text: '2 Hours'},
+                        {value: '4hour', text: '4 Hours'}
+                    ];
+                    suggestedGranularity = '2hour';
+                } else if (period === '3d') {
+                    availableOptions = [
+                        {value: '2hour', text: '2 Hours'},
+                        {value: '4hour', text: '4 Hours'},
+                        {value: '6hour', text: '6 Hours'}
+                    ];
+                    suggestedGranularity = '4hour';
+                } else if (period === 'thisweek' || period === '7d') {
+                    availableOptions = [
+                        {value: '4hour', text: '4 Hours'},
+                        {value: '6hour', text: '6 Hours'},
                         {value: 'day', text: 'Day'}
                     ];
-                    suggestedGranularity = 'hour';
-                } else if (period === '30d') {
+                    suggestedGranularity = '6hour';
+                } else if (period === '2w') {
                     availableOptions = [
-                        {value: 'hour', text: 'Hour'},
+                        {value: '6hour', text: '6 Hours'},
+                        {value: 'day', text: 'Day'}
+                    ];
+                    suggestedGranularity = 'day';
+                } else if (period === 'thismonth' || period === '30d') {
+                    availableOptions = [
                         {value: 'day', text: 'Day'},
                         {value: 'week', text: 'Week'}
                     ];
                     suggestedGranularity = 'day';
-                } else if (period === '1y') {
+                } else if (period === '3m') {
                     availableOptions = [
                         {value: 'day', text: 'Day'},
                         {value: 'week', text: 'Week'},
                         {value: 'month', text: 'Month'}
+                    ];
+                    suggestedGranularity = 'week';
+                } else if (period === '6m') {
+                    availableOptions = [
+                        {value: 'week', text: 'Week'},
+                        {value: 'month', text: 'Month'}
+                    ];
+                    suggestedGranularity = 'month';
+                } else if (period === 'thisyear' || period === '1y') {
+                    availableOptions = [
+                        {value: 'month', text: 'Month'},
+                        {value: 'quarter', text: 'Quarter'}
                     ];
                     suggestedGranularity = 'month';
                 } else {
@@ -4691,13 +5610,81 @@ def get_page_script(page):
                 });
             }
             
-            // Set up event listeners
-            document.getElementById('time-period').addEventListener('change', function() {
-                updateGranularitySuggestions();
-                updateChart();
-            });
-            document.getElementById('chart-type').addEventListener('change', updateChart);
-            document.getElementById('granularity').addEventListener('change', updateChart);
+            // Session storage functions for user preferences
+            function saveUserSelections() {
+                const timePeriodEl = document.getElementById('time-period');
+                const chartTypeEl = document.getElementById('chart-type');
+                const granularityEl = document.getElementById('granularity');
+                
+                if (timePeriodEl) {
+                    sessionStorage.setItem('analytics-time-period', timePeriodEl.value);
+                }
+                if (chartTypeEl) {
+                    sessionStorage.setItem('analytics-chart-type', chartTypeEl.value);
+                }
+                if (granularityEl) {
+                    sessionStorage.setItem('analytics-granularity', granularityEl.value);
+                }
+            }
+            
+            function restoreUserSelections() {
+                const savedPeriod = sessionStorage.getItem('analytics-time-period');
+                const savedChartType = sessionStorage.getItem('analytics-chart-type');
+                const savedGranularity = sessionStorage.getItem('analytics-granularity');
+                
+                const timePeriodEl = document.getElementById('time-period');
+                const chartTypeEl = document.getElementById('chart-type');
+                const granularityEl = document.getElementById('granularity');
+                
+                if (savedPeriod && timePeriodEl) {
+                    timePeriodEl.value = savedPeriod;
+                }
+                if (savedChartType && chartTypeEl) {
+                    chartTypeEl.value = savedChartType;
+                }
+                if (savedGranularity && granularityEl) {
+                    granularityEl.value = savedGranularity;
+                }
+            }
+            
+            // Restore user selections first
+            restoreUserSelections();
+            
+            // Set up event listeners with session storage
+            const timePeriodEl = document.getElementById('time-period');
+            const chartTypeEl = document.getElementById('chart-type');
+            const granularityEl = document.getElementById('granularity');
+            
+            if (timePeriodEl) {
+                timePeriodEl.addEventListener('change', function() {
+                    console.log('Time period changed to:', this.value);
+                    updateGranularitySuggestions();
+                    saveUserSelections();
+                    updateChart();
+                });
+            } else {
+                console.warn('time-period element not found');
+            }
+            
+            if (chartTypeEl) {
+                chartTypeEl.addEventListener('change', function() {
+                    console.log('Chart type changed to:', this.value);
+                    saveUserSelections();
+                    updateChart();
+                });
+            } else {
+                console.warn('chart-type element not found');
+            }
+            
+            if (granularityEl) {
+                granularityEl.addEventListener('change', function() {
+                    console.log('Granularity changed to:', this.value);
+                    saveUserSelections();
+                    updateChart();
+                });
+            } else {
+                console.warn('granularity element not found');
+            }
         }
         
         // SQL Query Interface Functions
@@ -4821,7 +5808,24 @@ WHERE datetime(timestamp) >= datetime('now', 'localtime', '${sqlTime}')
     AND production_kw > 0
 GROUP BY strftime('%H', timestamp)
 ORDER BY peak_production_kw DESC
-LIMIT 12;`
+LIMIT 12;`,
+
+                'weather': `-- 🌤️ Weather Data: Historical weather conditions (${timeframe.toUpperCase()})
+SELECT 
+    strftime('%H:%M', timestamp) as time_label,
+    ROUND(temperature, 1) as temperature_c,
+    humidity as humidity_percent,
+    pressure as pressure_hpa,
+    weather_main as condition,
+    weather_description as description,
+    ROUND(wind_speed, 1) as wind_speed_ms,
+    clouds as cloud_cover_percent,
+    city,
+    timestamp
+FROM weather_data 
+WHERE datetime(timestamp) >= datetime('now', 'localtime', '${sqlTime}')
+ORDER BY timestamp DESC 
+LIMIT 100;`
             };
             
             document.getElementById('sql-query').value = templates[type] || '';
@@ -5155,6 +6159,25 @@ LIMIT 12;`
             const query = samples[Math.floor(Math.random() * samples.length)];
             document.getElementById('sql-query').value = query;
         }
+        
+        // Initialize analytics page
+        if (document.getElementById('analyticsChart')) {
+            // Load Chart.js if not already loaded
+            if (typeof Chart === 'undefined') {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+                script.onload = () => {
+                    updateGranularitySuggestions(); // Set initial granularity options
+                    loadAnalyticsData();
+                    loadPerformanceSummary(); // Load performance summary on page load
+                };
+                document.head.appendChild(script);
+            } else {
+                updateGranularitySuggestions(); // Set initial granularity options
+                loadAnalyticsData();
+                loadPerformanceSummary(); // Load performance summary on page load
+            }
+        }
         '''
     elif page == 'data':
         return '''
@@ -5267,6 +6290,18 @@ LIMIT 12;`
                     console.error('Error loading inverter IDs:', error);
                     deviceFilter.innerHTML = '<option value="all">All Inverters</option>';
                 }
+            } else if (tableSelector.value === 'weather_data') {
+                // For weather_data, show weather-specific filters
+                deviceFilterContainer.style.display = 'block';
+                deviceFilter.innerHTML = `
+                    <option value="all">All Weather Records</option>
+                    <option value="clear">Clear Weather</option>
+                    <option value="clouds">Cloudy Weather</option>
+                    <option value="rain">Rainy Weather</option>
+                    <option value="snow">Snow Weather</option>
+                    <option value="high_temp">High Temperature (>25°C)</option>
+                    <option value="low_temp">Low Temperature (<10°C)</option>
+                `;
             } else {
                 // Default - show basic filter
                 deviceFilterContainer.style.display = 'block';
@@ -5642,7 +6677,24 @@ WHERE datetime(timestamp) >= datetime('now', 'localtime', '-24 hours')
     AND production_kw > 0
 GROUP BY strftime('%H', timestamp)
 ORDER BY peak_production_kw DESC
-LIMIT 12;`
+LIMIT 12;`,
+
+                'weather': `-- 🌤️ Weather Data: Historical weather conditions (${timeframe.toUpperCase()})
+SELECT 
+    strftime('%H:%M', timestamp) as time_label,
+    ROUND(temperature, 1) as temperature_c,
+    humidity as humidity_percent,
+    pressure as pressure_hpa,
+    weather_main as condition,
+    weather_description as description,
+    ROUND(wind_speed, 1) as wind_speed_ms,
+    clouds as cloud_cover_percent,
+    city,
+    timestamp
+FROM weather_data 
+WHERE datetime(timestamp) >= datetime('now', 'localtime', '${sqlTime}')
+ORDER BY timestamp DESC 
+LIMIT 100;`
             };
             
             document.getElementById('sql-query').value = templates[type] || '';
@@ -6913,6 +7965,132 @@ LIMIT 12;`
     else:
         return ''
 
+# Weather Configuration Endpoint
+@app.route('/api/weather/config', methods=['GET', 'POST'])
+def weather_config():
+    """Get or update weather configuration"""
+    import os
+    
+    # Get weather configuration from environment variables
+    weather_enabled = os.getenv('WEATHER_ENABLED', 'true').lower() == 'true'
+    weather_api_key = os.getenv('WEATHER_API_KEY', '')
+    weather_latitude = os.getenv('WEATHER_LATITUDE', '39.7392')
+    weather_longitude = os.getenv('WEATHER_LONGITUDE', '-104.9903')
+    
+    if request.method == 'GET':
+        return jsonify({
+            'success': True,
+            'enabled': weather_enabled,
+            'has_api_key': bool(weather_api_key),
+            'latitude': weather_latitude,
+            'longitude': weather_longitude,
+            'api_key_configured': bool(weather_api_key)
+        })
+    
+    elif request.method == 'POST':
+        try:
+            data = request.get_json()
+            
+            # This would require writing to .env file - for now, just return instructions
+            return jsonify({
+                'success': False,
+                'message': 'Weather configuration must be updated in /opt/solar_monitor/.env file',
+                'instructions': {
+                    'file_path': '/opt/solar_monitor/.env',
+                    'required_keys': ['WEATHER_API_KEY', 'WEATHER_LATITUDE', 'WEATHER_LONGITUDE', 'WEATHER_ENABLED'],
+                    'api_signup_url': 'https://openweathermap.org/api'
+                }
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+
+# Weather API Endpoint
+@app.route('/api/weather')
+def get_weather():
+    """Get current weather data for the solar system location"""
+    try:
+        import requests
+        import json
+        import os
+        
+        # Get weather configuration from environment variables
+        weather_enabled = os.getenv('WEATHER_ENABLED', 'true').lower() == 'true'
+        weather_api_key = os.getenv('WEATHER_API_KEY', '')
+        weather_latitude = os.getenv('WEATHER_LATITUDE', '39.7392')  # Default to Denver, CO
+        weather_longitude = os.getenv('WEATHER_LONGITUDE', '-104.9903')  # Default to Denver, CO
+        
+        # Check if weather is enabled and API key is configured
+        if not weather_enabled:
+            return jsonify({
+                'success': False,
+                'error': 'Weather integration is disabled'
+            })
+        
+        if not weather_api_key:
+            return jsonify({
+                'success': False,
+                'error': 'Weather API key not configured. Please set WEATHER_API_KEY in your .env file.'
+            })
+        
+        # Use configured coordinates or request parameters
+        lat = request.args.get('lat', weather_latitude)
+        lon = request.args.get('lon', weather_longitude)
+        
+        weather_api_url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={weather_api_key}&units=metric"
+        
+        response = requests.get(weather_api_url, timeout=10)
+        
+        if response.status_code == 200:
+            weather_data = response.json()
+            
+            # Extract relevant weather information
+            weather_info = {
+                'success': True,
+                'temperature': weather_data['main']['temp'],
+                'feels_like': weather_data['main']['feels_like'],
+                'humidity': weather_data['main']['humidity'],
+                'pressure': weather_data['main']['pressure'],
+                'description': weather_data['weather'][0]['description'],
+                'main': weather_data['weather'][0]['main'],
+                'icon': weather_data['weather'][0]['icon'],
+                'wind_speed': weather_data.get('wind', {}).get('speed', 0),
+                'wind_direction': weather_data.get('wind', {}).get('deg', 0),
+                'clouds': weather_data.get('clouds', {}).get('all', 0),
+                'visibility': weather_data.get('visibility', 10000) / 1000,  # Convert to km
+                'sunrise': weather_data['sys']['sunrise'],
+                'sunset': weather_data['sys']['sunset'],
+                'timezone': weather_data['timezone'],
+                'city': weather_data['name'],
+                'country': weather_data['sys']['country']
+            }
+            
+            # Store weather data in database for historical analysis
+            store_weather_data(weather_info)
+            
+            return jsonify(weather_info)
+        else:
+            if response.status_code == 401:
+                return jsonify({
+                    'success': False,
+                    'error': 'Weather API key not configured or invalid. Please check your OpenWeatherMap API key.'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': f'Weather API returned status {response.status_code}'
+                })
+            
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            'success': False,
+            'error': f'Network error: {str(e)}'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Error fetching weather: {str(e)}'
+        })
+
 # PVS6 Proxy API Endpoint
 @app.route('/api/pvs6/proxy')
 def pvs6_proxy():
@@ -7008,23 +8186,73 @@ def historical_data():
         cursor = conn.cursor()
         
         # Determine time range based on period
-        if period == '1h':
+        start_time = None
+        hours_back = None
+        
+        if period == '15min':
+            hours_back = 0.25
+            time_format = '%H:%M'
+        elif period == '30min':
+            hours_back = 0.5
+            time_format = '%H:%M'
+        elif period == '1h':
             hours_back = 1
+            time_format = '%H:%M'
+        elif period == '2h':
+            hours_back = 2
             time_format = '%H:%M'
         elif period == '4h':
             hours_back = 4
             time_format = '%H:%M'
+        elif period == '6h':
+            hours_back = 6
+            time_format = '%H:%M'
         elif period == '12h':
             hours_back = 12
+            time_format = '%H:%M'
+        elif period == 'today':
+            # From start of today
+            cursor.execute("SELECT datetime('now', 'localtime', 'start of day') as start_time")
+            start_time = cursor.fetchone()['start_time']
             time_format = '%H:%M'
         elif period == '24h':
             hours_back = 24
             time_format = '%H:%M'
+        elif period == '2d':
+            hours_back = 48
+            time_format = '%m/%d %H:%M'
+        elif period == '3d':
+            hours_back = 72
+            time_format = '%m/%d %H:%M'
+        elif period == 'thisweek':
+            # From start of this week (Monday)
+            cursor.execute("SELECT datetime('now', 'localtime', 'weekday 0', '-6 days') as start_time")
+            start_time = cursor.fetchone()['start_time']
+            time_format = '%m/%d %H:%M'
         elif period == '7d':
             hours_back = 24 * 7
             time_format = '%m/%d %H:%M'
+        elif period == '2w':
+            hours_back = 24 * 14
+            time_format = '%m/%d'
+        elif period == 'thismonth':
+            # From start of this month
+            cursor.execute("SELECT datetime('now', 'localtime', 'start of month') as start_time")
+            start_time = cursor.fetchone()['start_time']
+            time_format = '%m/%d'
         elif period == '30d':
             hours_back = 24 * 30
+            time_format = '%m/%d'
+        elif period == '3m':
+            hours_back = 24 * 90
+            time_format = '%m/%d'
+        elif period == '6m':
+            hours_back = 24 * 180
+            time_format = '%m/%d'
+        elif period == 'thisyear':
+            # From start of this year
+            cursor.execute("SELECT datetime('now', 'localtime', 'start of year') as start_time")
+            start_time = cursor.fetchone()['start_time']
             time_format = '%m/%d'
         elif period == '1y':
             hours_back = 24 * 365
@@ -7034,24 +8262,39 @@ def historical_data():
             time_format = '%H:%M'
         
         # Determine aggregation based on granularity and period
-        if granularity == 'minute':
+        if granularity == '30sec':
+            group_by = "strftime('%Y-%m-%d %H:%M:', timestamp) || printf('%02d', (cast(strftime('%S', timestamp) as integer) / 30) * 30)"
+            # For 30sec granularity, show seconds format for very short periods
+            if hours_back is not None and hours_back <= 0.5:  # 30 minutes or less
+                time_format = '%H:%M:%S'
+            elif hours_back is not None and hours_back <= 2:
+                time_format = '%H:%M:%S'
+            else:
+                time_format = '%m/%d %H:%M:%S'
+        elif granularity == 'minute':
             group_by = "strftime('%Y-%m-%d %H:%M', timestamp)"
             # For minute granularity, show different formats based on period
-            if hours_back <= 1:
+            if hours_back is not None and hours_back <= 1:
                 time_format = '%H:%M'
-            elif hours_back <= 12:
+            elif hours_back is not None and hours_back <= 12:
+                time_format = '%H:%M'
+            else:
+                time_format = '%m/%d %H:%M'
+        elif granularity == '5min':
+            group_by = "strftime('%Y-%m-%d %H:', timestamp) || printf('%02d', (cast(strftime('%M', timestamp) as integer) / 5) * 5)"
+            if hours_back is not None and hours_back <= 12:
                 time_format = '%H:%M'
             else:
                 time_format = '%m/%d %H:%M'
         elif granularity == '15min':
             group_by = "strftime('%Y-%m-%d %H:', timestamp) || printf('%02d', (cast(strftime('%M', timestamp) as integer) / 15) * 15)"
-            if hours_back <= 12:
+            if hours_back is not None and hours_back <= 12:
                 time_format = '%H:%M'
             else:
                 time_format = '%m/%d %H:%M'
         elif granularity == 'hour':
             group_by = "strftime('%Y-%m-%d %H', timestamp)"
-            if hours_back <= 24:
+            if hours_back is not None and hours_back <= 24:
                 time_format = '%H:%M'
             else:
                 time_format = '%m/%d %H:%M'
@@ -7070,28 +8313,44 @@ def historical_data():
         else:
             # Default to hour grouping
             group_by = "strftime('%Y-%m-%d %H', timestamp)"
-            if hours_back <= 24:
+            if hours_back is not None and hours_back <= 24:
                 time_format = '%H:%M'
             else:
                 time_format = '%m/%d %H:%M'
 
         # Get aggregated historical data
-        # Build the datetime filter string directly
-        hours_filter = f"datetime('now', 'localtime', '-{hours_back} hours')"
-        
-        cursor.execute(f'''
-            SELECT 
-                {group_by} as time_group,
-                AVG(production_kw) as production_kw,
-                AVG(consumption_kw) as consumption_kw,
-                AVG(production_kw - consumption_kw) as net_export_kw,
-                strftime(?, MIN(timestamp)) as time_label,
-                MIN(timestamp) as timestamp
-            FROM solar_data 
-            WHERE datetime(timestamp) >= {hours_filter}
-            GROUP BY {group_by}
-            ORDER BY MIN(timestamp) ASC
-        ''', (time_format,))
+        # Build the datetime filter based on period type
+        if start_time is not None:
+            # Use the start_time we calculated earlier for "this" periods
+            cursor.execute(f'''
+                SELECT 
+                    {group_by} as time_group,
+                    AVG(production_kw) as production_kw,
+                    AVG(consumption_kw) as consumption_kw,
+                    AVG(production_kw - consumption_kw) as net_export_kw,
+                    strftime(?, MIN(timestamp)) as time_label,
+                    MIN(timestamp) as timestamp
+                FROM solar_data 
+                WHERE datetime(timestamp) >= ?
+                GROUP BY {group_by}
+                ORDER BY MIN(timestamp) ASC
+            ''', (time_format, start_time))
+        else:
+            # Use hours_back for relative periods
+            hours_filter = f"datetime('now', 'localtime', '-{hours_back} hours')"
+            cursor.execute(f'''
+                SELECT 
+                    {group_by} as time_group,
+                    AVG(production_kw) as production_kw,
+                    AVG(consumption_kw) as consumption_kw,
+                    AVG(production_kw - consumption_kw) as net_export_kw,
+                    strftime(?, MIN(timestamp)) as time_label,
+                    MIN(timestamp) as timestamp
+                FROM solar_data 
+                WHERE datetime(timestamp) >= {hours_filter}
+                GROUP BY {group_by}
+                ORDER BY MIN(timestamp) ASC
+            ''', (time_format,))
         
         rows = cursor.fetchall()
         
@@ -7137,9 +8396,9 @@ def historical_data():
                 'peak_consumption_time': peak_cons_data['time_label'],
                 'best_export': best_export,
                 'best_export_time': best_export_data['time_label'],
-                'avg_daily_production': total_production / max(1, hours_back / 24),
-                'avg_daily_consumption': total_consumption / max(1, hours_back / 24),
-                'avg_daily_export': net_export / max(1, hours_back / 24)
+                'avg_daily_production': total_production / max(1, (hours_back or 24) / 24),
+                'avg_daily_consumption': total_consumption / max(1, (hours_back or 24) / 24),
+                'avg_daily_export': net_export / max(1, (hours_back or 24) / 24)
             }
         else:
             # Generate sample data if no real data available
@@ -8342,7 +9601,7 @@ def browse_table():
         cursor = conn.cursor()
         
         # Validate table name for security
-        valid_tables = ['solar_data', 'device_data', 'system_status']
+        valid_tables = ['solar_data', 'device_data', 'system_status', 'weather_data']
         if table_name not in valid_tables:
             return jsonify({'success': False, 'error': 'Invalid table name'})
         
@@ -8385,6 +9644,20 @@ def browse_table():
                     where_conditions.append("production_kw > 0")
                 elif device_filter == 'meters':
                     where_conditions.append("consumption_kw > 0")
+            elif table_name == 'weather_data':
+                # For weather_data, filter based on weather conditions
+                if device_filter == 'clear':
+                    where_conditions.append("weather_main = 'Clear'")
+                elif device_filter == 'clouds':
+                    where_conditions.append("weather_main = 'Clouds'")
+                elif device_filter == 'rain':
+                    where_conditions.append("weather_main = 'Rain'")
+                elif device_filter == 'snow':
+                    where_conditions.append("weather_main = 'Snow'")
+                elif device_filter == 'high_temp':
+                    where_conditions.append("temperature > 25")
+                elif device_filter == 'low_temp':
+                    where_conditions.append("temperature < 10")
         
         where_clause = ' AND '.join(where_conditions) if where_conditions else '1=1'
         
@@ -9025,7 +10298,8 @@ def get_config():
                     'WIFI_SSID': 'SunPower12345',
                     'PVS6_IP_ADDRESS': '172.27.152.1',
                     'SYSTEM_TIMEZONE': 'America/Denver',
-                    'DATA_COLLECTION_INTERVAL': '60'
+                    'DATA_COLLECTION_INTERVAL': '60',
+                    'WEATHER_API_KEY': ''
                 }
         
         return jsonify({
@@ -9043,7 +10317,8 @@ def get_config():
                 'WIFI_SSID': 'SunPower12345',
                 'PVS6_IP_ADDRESS': '172.27.152.1',
                 'SYSTEM_TIMEZONE': 'America/Denver',
-                'DATA_COLLECTION_INTERVAL': '60'
+                'DATA_COLLECTION_INTERVAL': '60',
+                'WEATHER_API_KEY': ''
             },
             'config_exists': False,
             'error': f'Configuration read error: {str(e)}'
@@ -9067,6 +10342,12 @@ PVS6_IP_ADDRESS={data.get('PVS6_IP_ADDRESS', '172.27.152.1')}
 # System Configuration
 SYSTEM_TIMEZONE={data.get('SYSTEM_TIMEZONE', 'America/Denver')}
 DATA_COLLECTION_INTERVAL={data.get('DATA_COLLECTION_INTERVAL', '60')}
+
+# Weather Configuration (Optional)
+WEATHER_ENABLED=true
+WEATHER_API_KEY={data.get('WEATHER_API_KEY', '')}
+WEATHER_LATITUDE=39.7392
+WEATHER_LONGITUDE=-104.9903
 
 # Database Configuration
 DATABASE_PATH=/opt/solar_monitor/solar_data.db
@@ -9104,6 +10385,178 @@ DATABASE_PATH=/opt/solar_monitor/solar_data.db
             'error': f'Error saving configuration: {str(e)}'
         }), 500
 
+# Weather Data API Endpoints
+@app.route('/api/weather/historical')
+def weather_historical():
+    """Get historical weather data for analysis"""
+    try:
+        period = request.args.get('period', '24h')
+        limit = request.args.get('limit', '100')
+        
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'success': False, 'error': 'Database connection failed'})
+        
+        cursor = conn.cursor()
+        
+        # Determine time range based on period
+        if period == '1h':
+            hours_back = 1
+        elif period == '6h':
+            hours_back = 6
+        elif period == '24h':
+            hours_back = 24
+        elif period == '7d':
+            hours_back = 24 * 7
+        elif period == '30d':
+            hours_back = 24 * 30
+        else:
+            hours_back = 24
+        
+        cursor.execute('''
+            SELECT 
+                timestamp,
+                temperature,
+                feels_like,
+                humidity,
+                pressure,
+                clouds,
+                wind_speed,
+                wind_direction,
+                weather_main,
+                weather_description,
+                weather_icon,
+                city
+            FROM weather_data 
+            WHERE datetime(timestamp) >= datetime('now', '-{} hours')
+            ORDER BY timestamp DESC
+            LIMIT ?
+        '''.format(hours_back), (int(limit),))
+        
+        rows = cursor.fetchall()
+        
+        weather_data = []
+        for row in rows:
+            weather_data.append({
+                'timestamp': row['timestamp'],
+                'temperature': row['temperature'],
+                'feels_like': row['feels_like'],
+                'humidity': row['humidity'],
+                'pressure': row['pressure'],
+                'clouds': row['clouds'],
+                'wind_speed': row['wind_speed'],
+                'wind_direction': row['wind_direction'],
+                'weather_main': row['weather_main'],
+                'weather_description': row['weather_description'],
+                'weather_icon': row['weather_icon'],
+                'city': row['city']
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'data': weather_data,
+            'period': period,
+            'count': len(weather_data)
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/weather/stats')
+def weather_stats():
+    """Get weather statistics for analysis"""
+    try:
+        period = request.args.get('period', '24h')
+        
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'success': False, 'error': 'Database connection failed'})
+        
+        cursor = conn.cursor()
+        
+        # Determine time range
+        if period == '24h':
+            hours_back = 24
+        elif period == '7d':
+            hours_back = 24 * 7
+        elif period == '30d':
+            hours_back = 24 * 30
+        else:
+            hours_back = 24
+        
+        cursor.execute('''
+            SELECT 
+                COUNT(*) as total_records,
+                AVG(temperature) as avg_temp,
+                MIN(temperature) as min_temp,
+                MAX(temperature) as max_temp,
+                AVG(humidity) as avg_humidity,
+                AVG(pressure) as avg_pressure,
+                AVG(wind_speed) as avg_wind_speed,
+                AVG(clouds) as avg_clouds
+            FROM weather_data 
+            WHERE datetime(timestamp) >= datetime('now', '-{} hours')
+        '''.format(hours_back))
+        
+        row = cursor.fetchone()
+        
+        # Get weather condition distribution
+        cursor.execute('''
+            SELECT 
+                weather_main,
+                COUNT(*) as count,
+                ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM weather_data 
+                    WHERE datetime(timestamp) >= datetime('now', '-{} hours')), 2) as percentage
+            FROM weather_data 
+            WHERE datetime(timestamp) >= datetime('now', '-{} hours')
+            GROUP BY weather_main
+            ORDER BY count DESC
+        '''.format(hours_back, hours_back))
+        
+        conditions = cursor.fetchall()
+        
+        conn.close()
+        
+        stats = {
+            'success': True,
+            'period': period,
+            'total_records': row['total_records'],
+            'temperature': {
+                'average': round(row['avg_temp'], 1) if row['avg_temp'] else None,
+                'minimum': round(row['min_temp'], 1) if row['min_temp'] else None,
+                'maximum': round(row['max_temp'], 1) if row['max_temp'] else None
+            },
+            'humidity': {
+                'average': round(row['avg_humidity'], 1) if row['avg_humidity'] else None
+            },
+            'pressure': {
+                'average': round(row['avg_pressure'], 1) if row['avg_pressure'] else None
+            },
+            'wind_speed': {
+                'average': round(row['avg_wind_speed'], 1) if row['avg_wind_speed'] else None
+            },
+            'clouds': {
+                'average': round(row['avg_clouds'], 1) if row['avg_clouds'] else None
+            },
+            'conditions': [
+                {
+                    'weather': condition['weather_main'],
+                    'count': condition['count'],
+                    'percentage': condition['percentage']
+                }
+                for condition in conditions
+            ]
+        }
+        
+        return jsonify(stats)
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 if __name__ == '__main__':
     print("🌞 Solar Monitor v1.0.0 - Production Release")
+    # Initialize weather table on startup
+    init_weather_table()
     app.run(host='0.0.0.0', port=5000, debug=False)

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chart Update Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .controls { margin: 10px 0; }
+        select { padding: 5px; margin: 5px; }
+        button { padding: 8px 15px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .log { background: #f8f9fa; padding: 10px; border-radius: 3px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Solar Monitor Chart Update Test</h1>
+    
+    <div class="test-section">
+        <h3>Chart Controls Test</h3>
+        <div class="controls">
+            <select id="time-period">
+                <option value="15min">Last 15 Minutes</option>
+                <option value="30min">Last 30 Minutes</option>
+                <option value="1h">Last Hour</option>
+                <option value="2h">Last 2 Hours</option>
+                <option value="4h">Last 4 Hours</option>
+                <option value="6h">Last 6 Hours</option>
+                <option value="12h">Last 12 Hours</option>
+                <option value="today">Today</option>
+                <option value="24h" selected>Last 24 Hours</option>
+                <option value="2d">Last 2 Days</option>
+                <option value="3d">Last 3 Days</option>
+                <option value="week">Last Week</option>
+                <option value="thisweek">This Week</option>
+                <option value="thismonth">This Month</option>
+                <option value="thisyear">This Year</option>
+                <option value="month">Last Month</option>
+                <option value="3months">Last 3 Months</option>
+                <option value="6months">Last 6 Months</option>
+                <option value="year">Last Year</option>
+            </select>
+            
+            <select id="granularity">
+                <option value="minute">Minute</option>
+                <option value="5min">5 Minutes</option>
+                <option value="15min">15 Minutes</option>
+                <option value="hour" selected>Hour</option>
+                <option value="day">Day</option>
+                <option value="week">Week</option>
+                <option value="month">Month</option>
+                <option value="year">Year</option>
+            </select>
+            
+            <select id="chart-type">
+                <option value="line" selected>Line Chart</option>
+                <option value="area">Area Chart</option>
+                <option value="bar">Bar Chart</option>
+            </select>
+        </div>
+        
+        <div class="controls">
+            <button onclick="testSingleUpdate()">Test Single Update</button>
+            <button onclick="testMultipleUpdates()">Test Multiple Updates</button>
+            <button onclick="testRandomCombinations()">Test Random Combinations</button>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test Results</h3>
+        <div id="log" class="log">Ready to test chart updates...\n</div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://192.168.1.126:5000';
+        let testCount = 0;
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+            logDiv.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = 'Log cleared...\n';
+            testCount = 0;
+        }
+        
+        async function testApiCall(period, granularity) {
+            try {
+                const url = `${API_BASE}/api/historical_data?period=${period}&granularity=${granularity}`;
+                log(`Testing API: ${period} + ${granularity}`);
+                
+                const startTime = Date.now();
+                const response = await fetch(url);
+                const data = await response.json();
+                const duration = Date.now() - startTime;
+                
+                if (data.success) {
+                    log(`✅ SUCCESS: ${data.data.length} records in ${duration}ms`, 'success');
+                    return { success: true, count: data.data.length, duration };
+                } else {
+                    log(`❌ API ERROR: ${data.error}`, 'error');
+                    return { success: false, error: data.error };
+                }
+            } catch (error) {
+                log(`❌ NETWORK ERROR: ${error.message}`, 'error');
+                return { success: false, error: error.message };
+            }
+        }
+        
+        async function testSingleUpdate() {
+            testCount++;
+            log(`\n🧪 Test ${testCount}: Single Update`);
+            
+            const period = document.getElementById('time-period').value;
+            const granularity = document.getElementById('granularity').value;
+            const chartType = document.getElementById('chart-type').value;
+            
+            log(`Selected: ${period} + ${granularity} + ${chartType}`);
+            
+            const result = await testApiCall(period, granularity);
+            
+            if (result.success) {
+                log(`✅ Test ${testCount} PASSED: ${result.count} records`, 'success');
+            } else {
+                log(`❌ Test ${testCount} FAILED: ${result.error}`, 'error');
+            }
+        }
+        
+        async function testMultipleUpdates() {
+            testCount++;
+            log(`\n🧪 Test ${testCount}: Multiple Sequential Updates`);
+            
+            const combinations = [
+                ['today', 'hour'],
+                ['24h', '15min'],
+                ['week', 'day'],
+                ['thismonth', 'week']
+            ];
+            
+            let passed = 0;
+            let failed = 0;
+            
+            for (const [period, granularity] of combinations) {
+                // Update dropdowns
+                document.getElementById('time-period').value = period;
+                document.getElementById('granularity').value = granularity;
+                
+                const result = await testApiCall(period, granularity);
+                
+                if (result.success) {
+                    passed++;
+                } else {
+                    failed++;
+                }
+                
+                // Small delay between tests
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            if (failed === 0) {
+                log(`✅ Test ${testCount} PASSED: ${passed}/${combinations.length} combinations worked`, 'success');
+            } else {
+                log(`❌ Test ${testCount} FAILED: ${failed}/${combinations.length} combinations failed`, 'error');
+            }
+        }
+        
+        async function testRandomCombinations() {
+            testCount++;
+            log(`\n🧪 Test ${testCount}: Random Combinations`);
+            
+            const periods = ['15min', '1h', '6h', 'today', '24h', 'week', 'thismonth'];
+            const granularities = ['minute', '15min', 'hour', 'day'];
+            
+            let passed = 0;
+            let failed = 0;
+            const testCount = 5;
+            
+            for (let i = 0; i < testCount; i++) {
+                const period = periods[Math.floor(Math.random() * periods.length)];
+                const granularity = granularities[Math.floor(Math.random() * granularities.length)];
+                
+                // Update dropdowns
+                document.getElementById('time-period').value = period;
+                document.getElementById('granularity').value = granularity;
+                
+                const result = await testApiCall(period, granularity);
+                
+                if (result.success) {
+                    passed++;
+                } else {
+                    failed++;
+                }
+                
+                // Small delay between tests
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+            
+            if (failed === 0) {
+                log(`✅ Test ${testCount} PASSED: ${passed}/${testCount} random combinations worked`, 'success');
+            } else {
+                log(`❌ Test ${testCount} FAILED: ${failed}/${testCount} random combinations failed`, 'error');
+            }
+        }
+        
+        // Set up event listeners to log dropdown changes
+        document.getElementById('time-period').addEventListener('change', function() {
+            log(`📅 Time period changed to: ${this.value}`);
+        });
+        
+        document.getElementById('granularity').addEventListener('change', function() {
+            log(`⏱️ Granularity changed to: ${this.value}`);
+        });
+        
+        document.getElementById('chart-type').addEventListener('change', function() {
+            log(`📊 Chart type changed to: ${this.value}`);
+        });
+        
+        log('Chart update test page loaded. Ready to test!');
+    </script>
+</body>
+</html>

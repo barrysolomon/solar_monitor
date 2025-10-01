@@ -10,7 +10,7 @@ VERSION = {
     'major': 1,
     'minor': 1,
     'patch': 0,
-    'build': 100,  # Build number - increment for each deployment
+    'build': 140,  # Build number - increment for each deployment
     'release_date': '2025-09-25',
     'features': [
         'Beautiful Modern UI with Gradient Cards',

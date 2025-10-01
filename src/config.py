@@ -58,6 +58,22 @@ class Config:
     @property
     def backup_path(self):
         return os.getenv('BACKUP_PATH', '/opt/solar_monitor/backups')
+    
+    @property
+    def weather_api_key(self):
+        return os.getenv('WEATHER_API_KEY', '')
+    
+    @property
+    def weather_latitude(self):
+        return os.getenv('WEATHER_LATITUDE', '39.7392')  # Default to Denver, CO
+    
+    @property
+    def weather_longitude(self):
+        return os.getenv('WEATHER_LONGITUDE', '-104.9903')  # Default to Denver, CO
+    
+    @property
+    def weather_enabled(self):
+        return os.getenv('WEATHER_ENABLED', 'true').lower() == 'true'
 
 # Global config instance
 config = Config()
